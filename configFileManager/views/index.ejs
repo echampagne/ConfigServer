@@ -1,0 +1,148 @@
+  <html>
+  <head>
+
+  <!-- Libraries -->
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.10/angular.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.js"></script>
+    <scipt src="routes/index.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+    <!-- AngularJS script -->
+	<script>
+   	  var myApp = angular.module('myApp', ['ui.router']);
+
+   		myApp.config(['$stateProvider', '$urlRouterProvider',
+   			function($stateProvider, $urlRouterProvider){
+   				$stateProvider
+   				  .state('home', {
+   				  	url: '/home',
+   				  	templateUrl: '/home.html',
+   				  	controller: 'MainCtrl',
+   				  	resolve:{
+   				  		dictPromise: ['dict', function(dict){
+   				  			return dict.getAll();
+   				  		}]
+   				  	}
+          });
+
+          $urlRouterProvider.otherwise('home');
+   			}]);
+
+   	  myApp.factory('dict', ['$http', function($http){
+		    var o = {
+      	 dict: []
+		    };
+
+		    o.getAll = function(){
+				  return $http.get('/dict').success(function(data){
+				    angular.copy(data, o.dict);
+				  });
+		    };
+
+        o.get = function(id){
+          return $http.get('/dict/' + id).then(function(res){
+            return res.data;
+          });
+        };
+
+        o.create = function(entry) {
+          return $http.post('/dict', entry).success(function(data){
+            o.dict.push(data);
+          });
+        };
+
+        o.edit = function(id, entry) {
+          return $http.put('/dict/' + id, {key: entry.key, value: entry.value}).success(function(res){
+              return res.data;
+          })
+        }
+
+        o.delete = function(id) {
+          return $http.delete('/dict/' + id).then(function(res){
+            return res.data;
+          });
+        };
+
+	      return o;
+		  }]);
+
+
+		myApp.controller('MainCtrl', ['$scope', 'dict',
+			function($scope, dict){
+				$scope.dict = dict.dict;
+
+			$scope.addEntry = function(){
+				if(!$scope.dictKey || !$scope.dictValue ){ return; }
+
+        dict.create({
+          key: $scope.dictKey,
+          value: $scope.dictValue
+        });
+
+        $scope.dictKey='';
+        $scope.dictValue='';
+			};
+
+      $scope.deleteEntry = function(item){
+        var index = $scope.dict.indexOf(item);
+        $scope.dict.splice(index, 1);
+        dict.delete(item._id);
+      };
+
+      $scope.editEntry = function(item){
+        if(!$scope.dict.key || !$scope.dict.value ){ return; }
+
+        var index = $scope.dict.indexOf(item);
+        var editeditem = {key: $scope.dict.key, value: $scope.dict.value};
+
+        dict.edit(item._id, editeditem);
+
+        $scope.dict[index] = {key: $scope.dict.key, value: $scope.dict.value}
+
+      }
+    }]);
+
+
+
+   	</script>
+ </head>
+<!-- Template -->
+
+  <body ng-app='myApp'>
+  	<div ui-view></div>
+
+    <script type="text/ng-template" id="/home.html">
+    	<div class="page-header">
+    		<h1> Dictionary App </h1>
+    	</div>
+
+
+    	<form ng-submit="addEntry()">
+      		<p><strong>Key:</strong> <input type="text" ng-model="dictKey" placeholder="Key" ng-required></p>
+      		<p><strong>Value:</strong> <input type="text" ng-model="dictValue" placeholder="Value" ng-required></p>
+	        <button class="submit btn btn-primary">Add</button>
+   		</form>
+
+    	<ul ng-repeat="entry in dict">
+        <li>
+          <span ng-hide="editing" ng-click="editing = true">
+            {{entry.key}} | {{entry.value}}
+          </span>
+          <form ng-show="editing" ng-submit="editing = false">
+            <label>Key:</label>
+            <input type="text" ng-model="dict.key" placeholder="{{entry.key}}">
+            <label>Value:</label>
+            <input type="text" ng-model="dict.value" placeholder="{{entry.value}}">
+            <br/>
+            <button class="submit btn btn-primary" ng-click='editEntry(entry)'>Save</button>
+            <button class="btn btn-primary" ng-click='deleteEntry(entry)'>Delete</button>
+          </form>
+        </li>
+    </script>
+
+  </body>
+</html>
+
+
+
