@@ -7,7 +7,6 @@
     <scipt src="routes/index.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
-
     <!-- AngularJS script -->
 	<script>
    	  var myApp = angular.module('myApp', ['ui.router']);
@@ -97,9 +96,13 @@
         var editeditem = {key: $scope.dict.key, value: $scope.dict.value};
 
         dict.edit(item._id, editeditem);
+        window.location.replace("/") // to update id on new item.. otherwise update -> delete will cause delete to
+      }
 
-        $scope.dict[index] = {key: $scope.dict.key, value: $scope.dict.value}
-
+      $scope.cancel = function(){
+        $scope.dict.key='';
+        $scope.dict.value='';
+        return;
       }
     }]);
 
@@ -124,6 +127,7 @@
 	        <button class="submit btn btn-primary">Add</button>
    		</form>
 
+
     	<ul ng-repeat="entry in dict">
         <li>
           <span ng-hide="editing" ng-click="editing = true">
@@ -137,6 +141,7 @@
             <br/>
             <button class="submit btn btn-primary" ng-click='editEntry(entry)'>Save</button>
             <button class="btn btn-primary" ng-click='deleteEntry(entry)'>Delete</button>
+            <button class="btn btn-primary" ng-click='cancel())'>Cancel</button>
           </form>
         </li>
     </script>
