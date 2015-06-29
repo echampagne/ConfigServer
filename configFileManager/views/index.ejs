@@ -1,4 +1,4 @@
-  <html>
+<html>
   <head>
 
   <!-- Libraries -->
@@ -7,37 +7,38 @@
     <scipt src="routes/index.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
     <!-- AngularJS script -->
-	<script>
-   	  var myApp = angular.module('myApp', ['ui.router']);
+  <script>
+      var myApp = angular.module('myApp', ['ui.router']);
 
-   		myApp.config(['$stateProvider', '$urlRouterProvider',
-   			function($stateProvider, $urlRouterProvider){
-   				$stateProvider
-   				  .state('home', {
-   				  	url: '/home',
-   				  	templateUrl: '/home.html',
-   				  	controller: 'MainCtrl',
-   				  	resolve:{
-   				  		dictPromise: ['dict', function(dict){
-   				  			return dict.getAll();
-   				  		}]
-   				  	}
+      myApp.config(['$stateProvider', '$urlRouterProvider',
+        function($stateProvider, $urlRouterProvider){
+          $stateProvider
+            .state('home', {
+              url: '/home',
+              templateUrl: '/home.html',
+              controller: 'MainCtrl',
+              resolve:{
+                dictPromise: ['dict', function(dict){
+                  return dict.getAll();
+                }]
+              }
           });
 
           $urlRouterProvider.otherwise('home');
-   			}]);
+        }]);
 
-   	  myApp.factory('dict', ['$http', function($http){
-		    var o = {
-      	 dict: []
-		    };
+      myApp.factory('dict', ['$http', function($http){
+        var o = {
+         dict: []
+        };
 
-		    o.getAll = function(){
-				  return $http.get('/dict').success(function(data){
-				    angular.copy(data, o.dict);
-				  });
-		    };
+        o.getAll = function(){
+          return $http.get('/dict').success(function(data){
+            angular.copy(data, o.dict);
+          });
+        };
 
         o.get = function(id){
           return $http.get('/dict/' + id).then(function(res){
@@ -63,16 +64,20 @@
           });
         };
 
-	      return o;
-		  }]);
+        return o;
+      }]);
 
 
-		myApp.controller('MainCtrl', ['$scope', 'dict',
-			function($scope, dict){
-				$scope.dict = dict.dict;
+    myApp.controller('MainCtrl', ['$scope', 'dict',
+      function($scope, dict){
+        $scope.dict = dict.dict;
+        $scope.sortType = 'key';
+        $scope.sortReverse = false;
+        $scope.search = '';
+        $scope.editID = '';
 
-			$scope.addEntry = function(){
-				if(!$scope.dictKey || !$scope.dictValue ){ return; }
+      $scope.addEntry = function(){
+        if(!$scope.dictKey || !$scope.dictValue ){ return; }
 
         dict.create({
           key: $scope.dictKey,
@@ -81,7 +86,7 @@
 
         $scope.dictKey='';
         $scope.dictValue='';
-			};
+      };
 
       $scope.deleteEntry = function(item){
         var index = $scope.dict.indexOf(item);
@@ -89,65 +94,109 @@
         dict.delete(item._id);
       };
 
-      $scope.editEntry = function(item){
+      $scope.editEntry = function(id){
         if(!$scope.dict.key || !$scope.dict.value ){ return; }
 
-        var index = $scope.dict.indexOf(item);
+        var index = $scope.dict.indexOf(id);
         var editeditem = {key: $scope.dict.key, value: $scope.dict.value};
 
-        dict.edit(item._id, editeditem);
+        dict.edit(id, editeditem);
         window.location.replace("/") // to update id on new item.. otherwise update -> delete will cause delete to
       }
 
       $scope.cancel = function(){
         $scope.dict.key='';
         $scope.dict.value='';
+        $scope.editing = false;
         return;
+      }
+
+      $scope.editForm = function(entry){
+        $scope.editing = true;
+        $scope.dict.key = entry.key;
+        $scope.dict.value = entry.value;
+        $scope.editID = entry._id;
       }
     }]);
 
 
 
-   	</script>
+    </script>
  </head>
 <!-- Template -->
-
   <body ng-app='myApp'>
-  	<div ui-view></div>
+    <div ui-view></div>
 
     <script type="text/ng-template" id="/home.html">
-    	<div class="page-header">
-    		<h1> Dictionary App </h1>
-    	</div>
+      <div class="page-header">
+        <h1> Dictionary App </h1>
+      </div>
 
 
-    	<form ng-submit="addEntry()">
-      		<p><strong>Key:</strong> <input type="text" ng-model="dictKey" placeholder="Key" ng-required></p>
-      		<p><strong>Value:</strong> <input type="text" ng-model="dictValue" placeholder="Value" ng-required></p>
-	        <button class="submit btn btn-primary">Add</button>
-   		</form>
+      <form ng-submit="addEntry()">
+          <p><strong>Key:</strong> <input type="text" ng-model="dictKey" placeholder="Key" ng-required></p>
+          <p><strong>Value:</strong> <input type="text" ng-model="dictValue" placeholder="Value" ng-required></p>
+          <button class="submit btn btn-primary">Add</button>
+      </form>
+
+      <div class="alert alert-info">
+        <p>Sort Type: {{ sortType }}</p>
+        <p>Sort Reverse: {{ sortReverse }}</p>
+        <p>Search Query: {{ search }}</p>
+      </div>
+
+      <form>
+        <div class="form-group">
+          <div class="input-group">
+            <div class="input-group-addon"><i class="fa fa-search"></i></div>
+            <input type="text" class="form-control" placeholder="Search" ng-model="search">
+          </div>
+        </div>
+      </form>
+
+      <table class="table table bordered table-striped">
+        <thead>
+          <tr>
+            <td>
+              <a href="#" ng-click="sortType = 'key'; sortReverse = !sortReverse">
+                Key
+                <span ng-show="sortType == 'key' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'key' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
+            <td>
+              <a href="#" ng-click="sortType = 'value'; sortReverse = !sortReverse">
+                Value
+                <span ng-show="sortType == 'value' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'value' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr ng-repeat="entry in dict | orderBy:sortType:sortReverse | filter:search">
+              <td> {{entry.key}} </td>
+              <td>{{entry.value}} </td>
+              <td> <button class="btn btn-primary" ng-click='editForm(entry)'>Edit</button> </td>
+              <td> <button class="btn btn-primary" ng-click='deleteEntry(entry)'>Delete</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 ng-init="editing=false" ng-show="editing">Edit</h3>
+      <form ng-submit="editing=false" ng-show="editing">
+        <label>Key:</label>
+        <input type="text" ng-model="dict.key">
+        <label>Value:</label>
+        <input type="text" ng-model="dict.value">
+        <br/>
+        <button class="submit btn btn-primary" ng-click="editEntry(editID)">Save</button>
+        <button class="btn btn-primary" ng-click="cancel()">Cancel</button>
+      </form>
 
 
-    	<ul ng-repeat="entry in dict">
-        <li>
-          <span ng-hide="editing" ng-click="editing = true">
-            {{entry.key}} | {{entry.value}}
-          </span>
-          <form ng-show="editing" ng-submit="editing = false">
-            <label>Key:</label>
-            <input type="text" ng-model="dict.key" placeholder="{{entry.key}}">
-            <label>Value:</label>
-            <input type="text" ng-model="dict.value" placeholder="{{entry.value}}">
-            <br/>
-            <button class="submit btn btn-primary" ng-click='editEntry(entry)'>Save</button>
-            <button class="btn btn-primary" ng-click='deleteEntry(entry)'>Delete</button>
-            <button class="btn btn-primary" ng-click='cancel())'>Cancel</button>
-          </form>
-        </li>
     </script>
 
   </body>
 </html>
-
-
-
