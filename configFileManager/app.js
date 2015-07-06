@@ -7,9 +7,13 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 
 var mongoose = require('mongoose');
-require('./models/Dict');
+var passport = require('passport');
+
+require('./models/Clusters');
+require('./models/Users');
 
 var routes = require('./routes/index');
+require('./config/passport');
 
 mongoose.connect('mongodb://localhost/dict', function(err) {
     if(err) {
@@ -32,6 +36,7 @@ app.use(bodyParser.urlencoded());
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use(passport.initialize());
 app.use('/', routes);
 
 

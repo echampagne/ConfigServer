@@ -3,14 +3,16 @@
 
   <!-- Libraries -->
     <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.10/angular.min.js"></script>
+    <script src="//angular-ui.github.io/bootstrap/ui-bootstrap-tpls-0.12.0.js"></script>
     <script src="http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.js"></script>
     <scipt src="routes/index.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
     <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
     <!-- AngularJS script -->
   <script>
-      var myApp = angular.module('myApp', ['ui.router']);
+      var myApp = angular.module('myApp', ['ui.router', 'ui.bootstrap']);
 
       myApp.config(['$stateProvider', '$urlRouterProvider',
         function($stateProvider, $urlRouterProvider){
@@ -20,8 +22,8 @@
               templateUrl: '/home.html',
               controller: 'MainCtrl',
               resolve:{
-                dictPromise: ['dict', function(dict){
-                  return dict.getAll();
+                clusterPromise: ['clusters', function(clusters){
+                  return clusters.getAll();
                 }]
               }
           });
@@ -29,174 +31,315 @@
           $urlRouterProvider.otherwise('home');
         }]);
 
-      myApp.factory('dict', ['$http', function($http){
+      myApp.factory('clusters', ['$http', function($http){
         var o = {
-         dict: []
+         clusters: [],
         };
 
         o.getAll = function(){
-          return $http.get('/dict').success(function(data){
-            angular.copy(data, o.dict);
+          return $http.get('/clusters').success(function(data){
+            angular.copy(data, o.clusters);
           });
         };
 
         o.get = function(id){
-          return $http.get('/dict/' + id).then(function(res){
+          return $http.get('/clusters/' + id).then(function(res){
             return res.data;
           });
         };
 
-        o.create = function(entry) {
-          return $http.post('/dict', entry).success(function(data){
-            o.dict.push(data);
+        o.createCluster = function(cluster) {
+          return $http.post('/clusters', cluster).success(function(data){
+            o.clusters.push(data);
           });
         };
 
-        o.edit = function(id, entry) {
-          return $http.put('/dict/' + id, {key: entry.key, value: entry.value}).success(function(res){
-              return res.data;
-          })
-        }
-
-        o.delete = function(id) {
-          return $http.delete('/dict/' + id).then(function(res){
+        o.deleteCluster = function(id){
+           return $http.delete('/clusters/' + id).success(function(res){
             return res.data;
           });
+        };
+
+        o.createSystem = function(id, system){
+          return $http.post('/clusters/' + id, {hostname: system.hostname,
+                                                ipaddress: system.ipaddress,
+                                                alive: system.alive
+                                                }
+                            ).success(function(res){
+            return res.data;
+          });
+        };
+
+        o.deleteSystem = function(id, systemId){
+          return $http.delete('/clusters/' + id + '/' + systemId
+              ).success(function(res){
+                return res.data;
+              });
         };
 
         return o;
       }]);
 
 
-    myApp.controller('MainCtrl', ['$scope', 'dict',
-      function($scope, dict){
-        $scope.dict = dict.dict;
-        $scope.sortType = 'key';
-        $scope.sortReverse = false;
-        $scope.search = '';
-        $scope.editID = '';
+    // controller for cluster list
+    myApp.controller('MainCtrl', ['$scope', 'clusters', '$modal',
+      function($scope, clusters, $modal, $log){
+        $scope.clusters = clusters.clusters;
+        $scope.isCollapsed = true;
+        $scope.addform = false;
 
-      $scope.addEntry = function(){
-        if(!$scope.dictKey || !$scope.dictValue ){ return; }
+        $scope.addCluster = function(){
+          if(!$scope.name || !$scope.managerhostname || !$scope.manageripaddress || !$scope.manageralive){ return; }
 
-        dict.create({
-          key: $scope.dictKey,
-          value: $scope.dictValue
-        });
+          clusters.createCluster({name: $scope.name,
+                                  manager: {hostname: $scope.managerhostname,
+                                            ipaddress: $scope.manageripaddress,
+                                            alive: $scope.manageralive
+                                           }
+                                  });
 
-        $scope.dictKey='';
-        $scope.dictValue='';
+          $scope.name='';
+          $scope.managerhostname='';
+          $scope.manageripaddress='';
+          $scope.manageralive='';
+        };
+
+        $scope.remove = function(item){
+          var index = $scope.clusters.indexOf(item);
+          $scope.clusters.splice(index, 1);
+          clusters.deleteCluster(item._id);
+        };
+
+
+        $scope.removeSystem = function(id, sys){
+          clusters.deleteSystem(id, sys);
+          window.location.replace("/");
+        }
+
+        $scope.open = function(size, _cluster){
+          var modalInstance = $modal.open({
+            templateUrl: 'addSystemModal.html',
+            controller: 'SystemModalCtrl',
+            size: size,
+            resolve: {
+              cluster: function() {
+                return _cluster;
+              },
+              clusters: function() {
+                return clusters;
+              }
+            }
+          });
+
+          modalInstance.result.then(function(){
+          });
+        };
+
+
+
+      }]);
+
+    // controller for adding a system to a cluster
+    myApp.controller('SystemModalCtrl', function($scope, $modalInstance, cluster, clusters){
+
+      $scope.cluster = cluster;
+
+      $scope.save = function(id){
+          newSys = {hostname: $scope.systemhostname,
+                    ipaddress: $scope.systemipaddress,
+                    alive: $scope.systemalive
+                   };
+          clusters.createSystem(id, newSys);
+
+          window.location.replace("/");
+          $modalInstance.close();
       };
 
-      $scope.deleteEntry = function(item){
-        var index = $scope.dict.indexOf(item);
-        $scope.dict.splice(index, 1);
-        dict.delete(item._id);
-      };
-
-      $scope.editEntry = function(id){
-        if(!$scope.dict.key || !$scope.dict.value ){ return; }
-
-        var index = $scope.dict.indexOf(id);
-        var editeditem = {key: $scope.dict.key, value: $scope.dict.value};
-
-        dict.edit(id, editeditem);
-        window.location.replace("/") // to update id on new item.. otherwise update -> delete will cause delete to
-      }
 
       $scope.cancel = function(){
-        $scope.dict.key='';
-        $scope.dict.value='';
-        $scope.editing = false;
-        return;
-      }
+        $modalInstance.dismiss('cancel');
+      };
 
-      $scope.editForm = function(entry){
-        $scope.editing = true;
-        $scope.dict.key = entry.key;
-        $scope.dict.value = entry.value;
-        $scope.editID = entry._id;
-      }
-    }]);
+    });
+
 
 
 
     </script>
  </head>
-<!-- Template -->
   <body ng-app='myApp'>
     <div ui-view></div>
 
     <script type="text/ng-template" id="/home.html">
+
       <div class="page-header">
-        <h1> Dictionary App </h1>
+        <nav class="navbar navbar-default">
+          <div class="container-fluid">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">Config File Manager</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                <li><a href="#" ng-click="isCollapsed = false; addform=false">Clusters</a></li>
+                <li><a href="#" ng-click="isCollapsed = true; addform=false">Properties</a></li>
+              </ul>
+              <form class="navbar-form navbar-left" role="search">
+                  <div class="form-group">
+                    <div class="input-group">
+                      <div class="input-group-addon"><i class="fa fa-search"></i></div>
+                      <input type="text" class="form-control" placeholder="Search Cluster Names" ng-model="search.name">
+                    </div>
+                  </div>
+              </form>
+              <ul class="nav navbar-nav navbar-right">
+                <li><a href="#">Sign In</a></li>
+                <li><a href="#">Register</a></li>
+              </ul>
+            </div>
+          </div>
+        </nav>
       </div>
 
 
-      <form ng-submit="addEntry()">
-          <p><strong>Key:</strong> <input type="text" ng-model="dictKey" placeholder="Key" ng-required></p>
-          <p><strong>Value:</strong> <input type="text" ng-model="dictValue" placeholder="Value" ng-required></p>
-          <button class="submit btn btn-primary">Add</button>
-      </form>
+      <div ng-repeat="cluster in clusters | filter:search">
+        <div class="col-md-4">
+        <span>
+          <button class="btn btn-primary" ng-click="isCollapsed = !isCollapsed">
+           {{ cluster.name }}</button>
+           <button class="btn btn-danger" ng-click='remove(cluster)'>
+            <span class='glyphicon glyphicon-remove' aria-hidden='true'></span>
+          </button>
 
-      <div class="alert alert-info">
-        <p>Sort Type: {{ sortType }}</p>
-        <p>Sort Reverse: {{ sortReverse }}</p>
-        <p>Search Query: {{ search }}</p>
+
+          <div ng-show="isCollapsed" >
+            <div class="well">
+              <button class="btn btn-primary" ng-click='open(md, cluster)'>
+                  <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                  Add System
+              </button>
+
+              <table class="table table bordered table-striped">
+                <thead>
+                  <tr>
+                    <td>
+                      <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                        Name
+                        <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                      <a href="#" ng-click="sortType = 'hostname'; sortReverse = !sortReverse">
+                        hostname
+                        <span ng-show="sortType == 'hostname' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'hostname' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                      <a href="#" ng-click="sortType = 'ipaddress'; sortReverse = !sortReverse">
+                        ipaddress
+                        <span ng-show="sortType == 'ipaddress' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'ipaddress' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                      <a href="#" ng-click="sortType = 'alive'; sortReverse = !sortReverse">
+                        alive
+                        <span ng-show="sortType == 'alive' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'alive' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr>
+                      <td> 'Manager' </td>
+                      <td> {{ cluster.manager.hostname }} </td>
+                      <td> {{ cluster.manager.ipaddress }} </td>
+                      <td> {{ cluster.manager.alive }} </td>
+                  </tr>
+                  <tr ng-repeat='system in cluster.systems'>
+                      <td> 'System' </td>
+                      <td> {{ system.hostname }} </td>
+                      <td> {{ system.ipaddress}} </td>
+                      <td> {{ system.alive }} </td>
+                      <td>
+                        <button class="btn btn-danger" ng-click="removeSystem(cluster._id, system._id)">
+                          <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
+                        </button>
+                      </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </span>
+        </div>
       </div>
 
-      <form>
-        <div class="form-group">
-          <div class="input-group">
-            <div class="input-group-addon"><i class="fa fa-search"></i></div>
-            <input type="text" class="form-control" placeholder="Search" ng-model="search">
+      <div class='col-md-4'>
+        <div class='col-md-offset-2'>
+          <img src='http://cdn1.iconfinder.com/data/icons/musthave/256/Add.png' class='img-rounded' ng-click='addform=true' ng-hide='addform' style='height:140;width:140'>
+        </div>
+
+        <div ng-show='addform'>
+          <div class=well>
+            <form class='form-horizontal' ng-submit="addCluster()">
+              <div class="form-group">
+                <label for="clusterName" class="col-sm-2 control-label">Cluster</label>
+                <input type="text" id='clusterName' ng-model="name" placeholder="Name" ng-required>
+              </div>
+              <label  class="col-sm-2 control-label">Manager:</label>
+              <div class="form-group">
+                <label for="managerhost" class="col-sm-2 control-label">Hostname</label>
+                <input type="text" id='managerhost' ng-model="managerhostname" placeholder="hostname" ng-required>
+              </div>
+              <div class="form-group">
+                <label for="managerip" class="col-sm-4 control-label">ipaddress</label>
+                <input type="text" id='managerip'ng-model="manageripaddress" placeholder="ipaddress" ng-required>
+              </div>
+              <div class="form-group">
+                <label for="managera" class="col-sm-4 control-label">alive</label>
+                <input type="text" id='managera'ng-model="manageralive" placeholder="alive" ng-required>
+              </div>
+              <div class='pull-right'>
+                <button class="submit btn btn-primary" ng-click="addform = false">
+                  <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                </button>
+                <button class='btn btn-primary btn-sm' ng-click='addform = false'>Cancel</button>
+              </div>
+            </form>
           </div>
         </div>
-      </form>
 
-      <table class="table table bordered table-striped">
-        <thead>
-          <tr>
-            <td>
-              <a href="#" ng-click="sortType = 'key'; sortReverse = !sortReverse">
-                Key
-                <span ng-show="sortType == 'key' && !sortReverse" class="fa fa-caret-down"></span>
-                <span ng-show="sortType == 'key' && sortReverse" class="fa fa-caret-up"></span>
-              </a>
-            </td>
-            <td>
-              <a href="#" ng-click="sortType = 'value'; sortReverse = !sortReverse">
-                Value
-                <span ng-show="sortType == 'value' && !sortReverse" class="fa fa-caret-down"></span>
-                <span ng-show="sortType == 'value' && sortReverse" class="fa fa-caret-up"></span>
-              </a>
-            </td>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr ng-repeat="entry in dict | orderBy:sortType:sortReverse | filter:search">
-              <td> {{entry.key}} </td>
-              <td>{{entry.value}} </td>
-              <td> <button class="btn btn-primary" ng-click='editForm(entry)'>Edit</button> </td>
-              <td> <button class="btn btn-primary" ng-click='deleteEntry(entry)'>Delete</button></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3 ng-init="editing=false" ng-show="editing">Edit</h3>
-      <form ng-submit="editing=false" ng-show="editing">
-        <label>Key:</label>
-        <input type="text" ng-model="dict.key">
-        <label>Value:</label>
-        <input type="text" ng-model="dict.value">
-        <br/>
-        <button class="submit btn btn-primary" ng-click="editEntry(editID)">Save</button>
-        <button class="btn btn-primary" ng-click="cancel()">Cancel</button>
-      </form>
-
-
+      </div>
     </script>
+
+    <script type="text/ng-template" id="addSystemModal.html">
+       <div class="modal-header">
+            <h3 class="modal-title">Add System to {{cluster.name}}</h3>
+        </div>
+        <div class="modal-body">
+           <form>
+              <strong>hostname:</strong> <input type="text" ng-model="systemhostname" placeholder="hostname" ng-required><br/>
+              <strong>ipaddress:</strong> <input type="text" ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+              <strong>alive: </strong> <input type="text" ng-model="systemalive" placeholder="alive" ng-required></p>
+          </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" ng-click="save(cluster._id)">Save</button>
+            <button class="btn btn-warning" ng-click="cancel()">Cancel</button>
+        </div>
+    </script>
+
 
   </body>
 </html>
