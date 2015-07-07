@@ -6,6 +6,7 @@ router.get('/', function(req, res) {
   res.render('index');
 });
 
+
 var mongoose = require('mongoose');
 var passport = require('passport');
 var jwt = require('express-jwt');
@@ -26,7 +27,7 @@ router.get('/clusters', function(req, res, next){
 });
 
 /* Create a new cluster */
-router.post('/clusters', auth, function (req, res, next) {
+router.post('/clusters', function (req, res, next) {
     Cluster.create(req.body, function (err, cluster) {
       if (err) return next(err);
       res.json(cluster);
@@ -44,7 +45,7 @@ router.get('/clusters/:id', function (req, res, next) {
 
 
 /* Delete a cluster */
-router.delete('/clusters/:id', auth, function (req, res, next) {
+router.delete('/clusters/:id', function (req, res, next) {
     Cluster.findByIdAndRemove(req.params.id, req.body, function (err, cluster) {
       if (err) return next(err);
       res.json(cluster);
@@ -52,9 +53,9 @@ router.delete('/clusters/:id', auth, function (req, res, next) {
 });
 
 
-// ex: curl http://127.0.0.1:3000/clusters/559a893fce3d73381cb40479 -d "hostname=testmhostname&ipaddress=testdelip&alive=testalive"
+// ex: curl http://127.0.0.1:3000/clusters/{clusterid}/system -d "hostname=testmhostname&ipaddress=testdelip&alive=testalive"
 /* Create a system for a particular cluster */
-router.post('/clusters/:id', auth, function (req, res, next){
+router.post('/clusters/:id/system', function (req, res, next){
   Cluster.findByIdAndUpdate(req.params.id,
                             {$push: {systems: {hostname: req.body.hostname,
                                               ipaddress: req.body.ipaddress,
@@ -69,7 +70,7 @@ router.post('/clusters/:id', auth, function (req, res, next){
 
 
 /* Edit a system in a cluster -- TODO: Implement this for the new schema */
-router.put('/clusters/:id', functison (req, res, next) {
+router.put('/clusters/:id/system', function (req, res, next) {
     Cluster.findByIdAndUpdate(req.params.id, {
       $set: {key: req.body.key, value: req.body.value}}, {upsert: true}, function (err, entry) {
       if (err) return next(err);
@@ -78,12 +79,12 @@ router.put('/clusters/:id', functison (req, res, next) {
 });
 
 
-// ex: curl -X DELETE http://127.0.0.1:3000/clusters/559a893fce3d73381cb40479/system -d "hostname=testmhostname2&ipaddress=testdelip2&alive=testalive2"
+// ex: curl -X DELETE http://127.0.0.1:3000/clusters/{clusterid}/system/{systemid} -d "hostname=testmhostname2&ipaddress=testdelip2&alive=testalive2"
 /*
    Delete an system for a cluster.
    data apparently can't be sent in a delete request, so had to use param in url
 */
-router.delete('/clusters/:id/:systemId', auth, function (req, res, next) {
+router.delete('/clusters/:id/system/:systemId', function (req, res, next) {
     Cluster.findByIdAndUpdate(req.params.id,
                               {$pull: {systems: {_id: req.params.systemId }}},
                               function (err, system) {

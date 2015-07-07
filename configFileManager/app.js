@@ -15,7 +15,7 @@ require('./models/Users');
 var routes = require('./routes/index');
 require('./config/passport');
 
-mongoose.connect('mongodb://localhost/dict', function(err) {
+mongoose.connect('mongodb://localhost/clusters', function(err) {
     if(err) {
         console.log('connection error', err);
     } else {
@@ -38,6 +38,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(passport.initialize());
 app.use('/', routes);
+
+
 
 
 /// catch 404 and forwarding to error handler
