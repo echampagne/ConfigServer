@@ -11,10 +11,6 @@
     <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
 
-
-
-
-
     <!-- AngularJS script -->
     <script>
       var myApp = angular.module('myApp', ['ui.router', 'ui.bootstrap']);
@@ -25,6 +21,16 @@
             .state('home', {
               url: '/home',
               templateUrl: '/home.html',
+              controller: 'MainCtrl',
+              resolve:{
+                clusterPromise: ['clusters', function(clusters){
+                  return clusters.getAll();
+                }]
+              }
+            })
+            .state('home_list', {
+              url: '/home/list',
+              templateUrl: '/home_list.html',
               controller: 'MainCtrl',
               resolve:{
                 clusterPromise: ['clusters', function(clusters){
@@ -51,14 +57,10 @@
                   $state.go('home');
                 }
               }]
-            })
-            .state('admin', {
-              url: '/admin',
-              templateUrl: 'admin.html'
             });
 
           $urlRouterProvider.otherwise('home');
-        }]);
+      }]);
 
 
       myApp.factory('auth', ['$http', '$window', function($http, $window){
@@ -141,20 +143,20 @@
           return $http.post('/clusters', cluster,
             {headers: {Authorization: 'Bearer '+auth.getToken()}
           }).success(function(data){
-            o.clusters.push(data);
+            return res.data;
           });
         };
 
-        o.deleteCluster = function(id){
-           return $http.delete('/clusters/' + id,
+        o.deleteCluster = function(c_name){
+           return $http.delete('/clusters/' + c_name,
             {headers: {Authorization: 'Bearer '+auth.getToken()}
           }).success(function(res){
             return res.data;
           });
         };
 
-        o.createSystem = function(id, system){
-          return $http.post('/clusters/' + id + '/system',
+        o.createSystem = function(c_name, system){
+          return $http.post('/clusters/' + c_name + '/system',
             {hostname: system.hostname,
             ipaddress: system.ipaddress,
             alive: system.alive},
@@ -164,8 +166,8 @@
           });
         };
 
-        o.deleteSystem = function(id, systemId){
-          return $http.delete('/clusters/' + id + '/system/' + systemId,
+        o.deleteSystem = function(c_name, systemId){
+          return $http.delete('/clusters/' + c_name + '/system/' + systemId,
             {headers: {Authorization: 'Bearer: '+ auth.getToken()}
               }).success(function(res){
                 return res.data;
@@ -192,28 +194,28 @@
           if(!$scope.name || !$scope.managerhostname || !$scope.manageripaddress || !$scope.manageralive){ return; }
 
           clusters.createCluster({name: $scope.name,
-                                  manager: {hostname: $scope.managerhostname,
-                                            ipaddress: $scope.manageripaddress,
-                                            alive: $scope.manageralive
-                                           }
+                                  hostname: $scope.managerhostname,
+                                  ipaddress: $scope.manageripaddress,
+                                  alive: $scope.manageralive
                                   });
 
           $scope.name='';
           $scope.managerhostname='';
           $scope.manageripaddress='';
           $scope.manageralive='';
+          window.location.replace("/");
         };
 
         // remove a cluster
         $scope.remove = function(item){
           var index = $scope.clusters.indexOf(item);
           $scope.clusters.splice(index, 1);
-          clusters.deleteCluster(item._id);
+          clusters.deleteCluster(item.name);
         };
 
 
-        $scope.removeSystem = function(id, sys){
-          clusters.deleteSystem(id, sys);
+        $scope.removeSystem = function(name, sys){
+          clusters.deleteSystem(name, sys);
           window.location.replace("/");
         }
 
@@ -243,12 +245,12 @@
 
       $scope.cluster = cluster;
 
-      $scope.save = function(id){
+      $scope.save = function(name){
           newSys = {hostname: $scope.systemhostname,
                     ipaddress: $scope.systemipaddress,
                     alive: $scope.systemalive
                    };
-          clusters.createSystem(id, newSys);
+          clusters.createSystem(name, newSys);
 
           window.location.replace("/");
           $modalInstance.close();
@@ -258,6 +260,7 @@
       $scope.cancel = function(){
         $modalInstance.dismiss('cancel');
       };
+
     });
 
     // Authentication Controller
@@ -299,7 +302,7 @@
 
     <script type="text/ng-template" id="/home.html">
       <div class="page-header">
-        <nav class="navbar navbar-default">
+        <nav class="navbar navbar-default navbar-fixed-top">
           <div class="container-fluid">
             <div class="navbar-header">
               <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1" aria-expanded="false">
@@ -313,8 +316,8 @@
 
             <div class="collapse navbar-collapse" id="navbar-collapse-1">
               <ul class="nav navbar-nav">
-                <li><a href="#" ng-click="isCollapsed = false; addform=false">Clusters</a></li>
-                <li><a href="#" ng-click="isCollapsed = true; addform=false">Properties</a></li>
+                <li><a href="#/home/list" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home/" ng-click="addform=false">Properties</a></li>
               </ul>
               <form class="navbar-form navbar-left" role="search">
                   <div class="form-group">
@@ -335,12 +338,11 @@
             </div>
           </div>
         </nav>
-
-        <div ng-hide="isLoggedIn()">
-            <h3 style="margin-left:30px;"> You need to <a href="/#/login">Log In</a> or <a href="/#/register">Register</a> before you can modify clusters.</h3>
-        </div>
       </div>
 
+      <div ng-hide="isLoggedIn()">
+            <p><h3 style="margin-left:30px;"> You need to <a href="/#/login">Log In</a> or <a href="/#/register">Register</a> before you can modify clusters.</h3></p></br>
+      </div>
 
       <div ng-repeat="cluster in clusters | filter:search">
         <div class="col-md-4">
@@ -410,7 +412,7 @@
                       <td> {{ system.ipaddress}} </td>
                       <td> {{ system.alive }} </td>
                       <td ng-show="isLoggedIn()">
-                        <button class="btn btn-danger" ng-click="removeSystem(cluster._id, system._id)">
+                        <button class="btn btn-danger" ng-click="removeSystem(cluster.name, system._id)">
                           <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
                         </button>
                       </td>
@@ -449,12 +451,14 @@
                   <input type="text" id='managera'ng-model="manageralive" placeholder="alive" ng-required>
                 </div>
                 <div class='pull-right'>
-                  <button class="submit btn btn-primary" ng-click="addform = false">
+                  <button class="submit btn btn-primary btn-md" ng-click="addform = false" style="padding-bottom: 8 px">
                     <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                   </button>
-                  <button class='btn btn-primary btn-sm' ng-click='addform = false'>Cancel</button>
                 </div>
               </form>
+              <div class='pull-right' style='padding-right:5px;'>
+                <button class='btn btn-danger btn-sm' ng-click='addform = false'>Cancel</button>
+              </div>
             </div>
           </div>
         </div>
@@ -469,16 +473,88 @@
         </div>
         <div class="modal-body">
            <form>
-              <strong>hostname:</strong> <input type="text" ng-model="systemhostname" placeholder="hostname" ng-required><br/>
-              <strong>ipaddress:</strong> <input type="text" ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
-              <strong>alive: </strong> <input type="text" ng-model="systemalive" placeholder="alive" ng-required></p>
+              <div class="form-group">
+                <label for='sysHostname' class="control-label">Hostname:</label>
+                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" ng-required>
+              </div>
+              <div class="form-group">
+                <label for='sysipaddress' class="control-label">ipaddress:</label>
+                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+              </div>
+              <div class="form-group">
+                <label for='sysalive' class="control-label">Alive:</label>
+                <input type="text" id='sysalive' ng-model="systemalive" placeholder="alive" ng-required></p>
+              </div>
           </form>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-primary" ng-click="save(cluster._id)">Save</button>
-            <button class="btn btn-warning" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-primary" ng-click="save(cluster.name)">Save</button>
         </div>
     </script>
+
+
+
+    <script type="text/ng-template" id="/home_list.html">
+       <div class="page-header">
+        <nav class="navbar navbar-default navbar-fixed-top">
+          <div class="container-fluid">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">Config File Manager</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                <li><a href="#/home/list" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home" ng-click="addform=false">Properties</a></li>
+              </ul>
+              <form class="navbar-form navbar-left" role="search">
+                  <div class="form-group">
+                    <div class="input-group">
+                      <div class="input-group-addon"><i class="fa fa-search"></i></div>
+                      <input type="text" class="form-control" placeholder="Search Cluster Names" ng-model="search.name">
+                    </div>
+                  </div>
+              </form>
+              <nav class="nav navbar-nav navbar-right" ng-controller="NavCtrl">
+                <ul class="nav navbar-nav">
+                  <li ng-show="isLoggedIn()"><a>{{ currentUser() }}</a></li>
+                  <li ng-show="isLoggedIn()"><a href="" ng-click="logOut()">Log Out</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/login">Log In</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/register">Register</a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </nav>
+
+        <div ng-hide="isLoggedIn()">
+            <h3 style="margin-left:30px;"> You need to <a href="/#/login">Log In</a> or <a href="/#/register">Register</a> before you can modify clusters.</h3>
+        </div>
+      </div>
+
+      <div>
+        <ul ng-repeat="cluster in clusters | filter:search">
+          <li>
+            {{ cluster.name }}
+          </li>
+        </ul>
+
+      </div>
+
+    </script>
+
+
+
+
+
+
 
     <!-- Register Template -->
     <script type="text/ng-template" id="/register.html">
@@ -517,6 +593,7 @@
         </div>
       </div>
     </script>
+
 
 
     <!-- Login Template -->
