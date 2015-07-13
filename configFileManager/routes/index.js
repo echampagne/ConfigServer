@@ -44,6 +44,7 @@ router.post('/properties', auth, function (req, res, next){
     });
  });
 
+/* Delete a property */
 router.delete('/properties/:key', auth, function(req, res, next){
   Property.findOneAndRemove({key : req.params.key}, req.body, function (err, property){
     if(err) return next(err);
@@ -52,38 +53,21 @@ router.delete('/properties/:key', auth, function(req, res, next){
 });
 
 
-/* This post also functions as a put method for manager info...
-   Creates a new cluster if cluster name specified doesn't exist.
-   If it does, update the manager's info
-   ex: curl http://127.0.0.1/clusters -d "name=testing&hostname=testing1&ipaddress=testing2&alive=testing3"
-        will either create a cluster or update an existing one with name : 'testing' to:
-          name: 'testing', manager: {hostname : 'testing1', ipaddress: 'testing2', alive: 'testing3'}
-*/
-router.post('/clusters', auth, function (req, res, next) {
-    Cluster.findOneAndUpdate({name : req.body.name},
-      {$set: {name: req.body.name, manager: {hostname: req.body.hostname,
-                                            ipaddress: req.body.ipaddress,
-                                            alive: req.body.alive
-                                           }
-            }
-      }, {upsert: true},
-      function (err, system) {
-        if (err) return next(err);
-        res.json(system);
-    });
-});
-
 
 /* POST
    Creates a new cluster
-
-  router.post('/clusters', function (req, res, next) {
-    Cluster.create(req.body, function (err, cluster) {
+*/
+  router.post('/clusters', auth, function (req, res, next) {
+    Cluster.create({name: req.body.name,
+      manager: {hostname: req.body.hostname,
+                ipaddress: req.body.ipaddress,
+                alive: req.body.alive
+                }}, function (err, cluster) {
       if (err) return next(err);
       res.json(cluster);
     });
   });
-*/
+
 
 
 /* PUT
@@ -113,14 +97,6 @@ router.delete('/clusters/:cluster_name', auth, function (req, res, next) {
     });
 });
 
-/* DELETE method above done by id..
-   Delete a cluster by id */
-// router.delete('/clusters/:id', function (req, res, next) {
-//     Cluster.findByIdAndRemove(req.params.id, req.body, function (err, cluster) {
-//       if (err) return next(err);
-//       res.json(cluster);
-//     });
-// });
 
 
 /* Return an individual cluster found by name*/
@@ -130,34 +106,6 @@ router.get('/clusters/:cluster_name', function (req, res, next) {
       res.json(cluster);
   });
 });
-
-/* GET method above done by id
-   Return an individual cluster found by id*/
-// router.get('/clusters/:id', function (req, res, next) {
-//   Cluster.findById(req.params.id, function (err, cluster){
-//       if(err) { return next(err); }
-//       res.json(cluster);
-//   });
-// });
-
-
-
-
-// ex: curl http://127.0.0.1:3000/clusters/{clusterid}/system -d "hostname=testmhostname&ipaddress=testdelip&alive=testalive"
-/* Create a system for a particular cluster. Cluster found by id */
-// router.post('/clusters/:id/system', function (req, res, next){
-//   Cluster.findByIdAndUpdate(req.params.id,
-//     {$push: {systems: {hostname: req.body.hostname,
-//                       ipaddress: req.body.ipaddress,
-//                       alive: req.body.alive
-//                       }
-//             }
-//     },
-//     function (err, system){
-//       if(err){ return next(err); }
-//       res.json(req.body);
-//   });
-// });
 
 
 /* Create a system for a particular cluster (found by name as url param) */
