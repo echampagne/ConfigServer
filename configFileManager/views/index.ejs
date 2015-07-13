@@ -28,13 +28,13 @@
                 }]
               }
             })
-            .state('home_list', {
-              url: '/home/list',
-              templateUrl: '/home_list.html',
-              controller: 'MainCtrl',
+            .state('home_properties', {
+              url: '/home/properties',
+              templateUrl: '/home_properties.html',
+              controller: 'PropertyCtrl',
               resolve:{
-                clusterPromise: ['clusters', function(clusters){
-                  return clusters.getAll();
+                propertyPromise: ['properties', function(properties){
+                  return properties.getAll();
                 }]
               }
             })
@@ -122,6 +122,7 @@
         return auth;
       }]);
 
+      /* Service for cluster list */
       myApp.factory('clusters', ['$http', 'auth', function($http, auth){
         var o = {
          clusters: [],
@@ -175,6 +176,39 @@
         };
 
         return o;
+      }]);
+
+
+      /* Service for property dictionary */
+      myApp.factory('properties', ['$http', 'auth', function($http, auth){
+        var p = {
+          properties: [],
+        };
+
+        p.getAll = function(){
+          return $http.get('/properties').success(function(data){
+            angular.copy(data, p.properties);
+          });
+        };
+
+        p.addProperty = function(property){
+          return $http.post('/properties', property,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+            p.properties.push(data);
+          });
+        };
+
+        p.deleteProperty = function(p_key){
+          return $http.delete('/properties/' + p_key,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(res){
+            return res.data;
+          })
+
+        }
+
+        return p;
       }]);
 
 
@@ -292,11 +326,42 @@
         $scope.logOut = auth.logOut;
       }]);
 
+
+
+    myApp.controller('PropertyCtrl', ['$scope', 'properties', 'auth',
+      function($scope, properties, auth){
+        $scope.properties = properties.properties;
+        $scope.sortType = 'key';
+        $scope.sortReverse = false;
+        $scope.search = '';
+        $scope.isLoggedIn = auth.isLoggedIn;
+
+
+        $scope.add = function(){
+          if(!$scope.key || !$scope.value){ return; };
+
+          properties.addProperty({
+            key: $scope.key,
+            value: $scope.value
+          });
+
+          $scope.key='';
+          $scope.value='';
+        };
+
+
+        $scope.remove = function(prop){
+          var index = $scope.properties.indexOf(prop);
+          $scope.properties.splice(index, 1);
+          properties.deleteProperty(prop.key);
+        };
+
+    }]);
     </script>
+
+
+
  </head>
-
-
-
   <body ng-app='myApp'>
     <div ui-view></div>
 
@@ -316,8 +381,8 @@
 
             <div class="collapse navbar-collapse" id="navbar-collapse-1">
               <ul class="nav navbar-nav">
-                <li><a href="#/home/list" ng-click="addform=false">Clusters</a></li>
-                <li><a href="#/home/" ng-click="addform=false">Properties</a></li>
+                <li><a href="#/home/" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home/properties" ng-click="addform=false">Properties</a></li>
               </ul>
               <form class="navbar-form navbar-left" role="search">
                   <div class="form-group">
@@ -495,7 +560,7 @@
 
 
 
-    <script type="text/ng-template" id="/home_list.html">
+    <script type="text/ng-template" id="/home_properties.html">
        <div class="page-header">
         <nav class="navbar navbar-default navbar-fixed-top">
           <div class="container-fluid">
@@ -511,14 +576,14 @@
 
             <div class="collapse navbar-collapse" id="navbar-collapse-1">
               <ul class="nav navbar-nav">
-                <li><a href="#/home/list" ng-click="addform=false">Clusters</a></li>
-                <li><a href="#/home" ng-click="addform=false">Properties</a></li>
+                <li><a href="#/home" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home/properties" ng-click="addform=false">Properties</a></li>
               </ul>
               <form class="navbar-form navbar-left" role="search">
                   <div class="form-group">
                     <div class="input-group">
                       <div class="input-group-addon"><i class="fa fa-search"></i></div>
-                      <input type="text" class="form-control" placeholder="Search Cluster Names" ng-model="search.name">
+                      <input type="text" class="form-control" placeholder="Search" ng-model="search">
                     </div>
                   </div>
               </form>
@@ -533,20 +598,59 @@
             </div>
           </div>
         </nav>
-
-        <div ng-hide="isLoggedIn()">
-            <h3 style="margin-left:30px;"> You need to <a href="/#/login">Log In</a> or <a href="/#/register">Register</a> before you can modify clusters.</h3>
-        </div>
       </div>
 
-      <div>
-        <ul ng-repeat="cluster in clusters | filter:search">
-          <li>
-            {{ cluster.name }}
-          </li>
-        </ul>
-
+      <div class="alert alert-info">
+        <p>Sort Type: {{ sortType }}</p>
+        <p>Sort Reverse: {{ sortReverse }}</p>
+        <p>Search Query: {{ search }}</p>
       </div>
+
+      <div ng-show="isLoggedIn()">
+        <form class='form-horizontal' ng-submit="add()">
+          <label for="Key" class="">Key</label>
+          <input type="text" id='Key' ng-model="key" placeholder="Key" ng-required>
+          <label for="Value" class="">Value</label>
+          <input type="text" id='Value' ng-model="value" placeholder="Value" ng-required>
+          <button class="submit btn btn-sm btn-primary">Add</button>
+        </form>
+      </div>
+
+      <table class="table table bordered table-striped">
+        <table class="table table bordered table-striped">
+        <thead>
+          <tr>
+            <td>
+              <a href="#" ng-click="sortType = 'key'; sortReverse = !sortReverse">
+                Key
+                <span ng-show="sortType == 'key' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'key' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
+            <td>
+              <a href="#" ng-click="sortType = 'value'; sortReverse = !sortReverse">
+                Value
+                <span ng-show="sortType == 'value' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'value' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr ng-repeat="prop in properties | orderBy:sortType:sortReverse | filter:search">
+              <td> {{prop.key}} </td>
+              <td>{{prop.value}} </td>
+              <td ng-show="isLoggedIn()">
+                <button class="btn btn-danger" ng-click="remove(prop)">
+                  <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
+                </button>
+              </td>
+          </tr>
+        </tbody>
+      </table>
+
+
 
     </script>
 

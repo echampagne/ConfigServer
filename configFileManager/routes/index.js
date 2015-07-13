@@ -13,6 +13,7 @@ var jwt = require('express-jwt');
 
 var Cluster = mongoose.model('Cluster');
 var User = mongoose.model('User');
+var Property = mongoose.model('Property');
 
 // note: secret is currently hardcoded.. change this before use
 var auth = jwt({secret: 'SECRET', userProperty: 'payload'});
@@ -27,6 +28,30 @@ router.get('/clusters', function(req, res, next){
 });
 
 
+/* Return the list of properties */
+router.get('/properties', function(req, res, next){
+  Property.find(function(err, properties){
+    if(err) return next(err);
+    res.json(properties)
+  });
+});
+
+/* Post a property */
+router.post('/properties', auth, function (req, res, next){
+    Property.create(req.body, function (err, property) {
+      if(err) return next(err);
+      res.json(property);
+    });
+ });
+
+router.delete('/properties/:key', auth, function(req, res, next){
+  Property.findOneAndRemove({key : req.params.key}, req.body, function (err, property){
+    if(err) return next(err);
+    res.json(property);
+  });
+});
+
+
 /* This post also functions as a put method for manager info...
    Creates a new cluster if cluster name specified doesn't exist.
    If it does, update the manager's info
@@ -34,7 +59,7 @@ router.get('/clusters', function(req, res, next){
         will either create a cluster or update an existing one with name : 'testing' to:
           name: 'testing', manager: {hostname : 'testing1', ipaddress: 'testing2', alive: 'testing3'}
 */
-router.post('/clusters', function (req, res, next) {
+router.post('/clusters', auth, function (req, res, next) {
     Cluster.findOneAndUpdate({name : req.body.name},
       {$set: {name: req.body.name, manager: {hostname: req.body.hostname,
                                             ipaddress: req.body.ipaddress,
@@ -48,8 +73,9 @@ router.post('/clusters', function (req, res, next) {
     });
 });
 
-/* POST method not combined with PUT.
-   Create a new cluster
+
+/* POST
+   Creates a new cluster
 
   router.post('/clusters', function (req, res, next) {
     Cluster.create(req.body, function (err, cluster) {
@@ -59,10 +85,11 @@ router.post('/clusters', function (req, res, next) {
   });
 */
 
-/* PUT method not combined with POST
-   Edit a cluster. Cluster found by name
 
-  router.put('/clusters/:cluster_name', function (req, res, next) {
+/* PUT
+   Edit a cluster. Cluster found by name
+*/
+  router.put('/clusters/:cluster_name', auth, function (req, res, next) {
       Cluster.findOneAndUpdate({name : req.params.cluster_name},
         {$set: {name: req.body.name, manager: {hostname: req.body.hostname,
                                               ipaddress: req.body.ipaddress,
@@ -75,11 +102,11 @@ router.post('/clusters', function (req, res, next) {
           res.json(system);
       });
   });
-*/
 
 
-/* Delete a cluster by name */
-router.delete('/clusters/:cluster_name', function (req, res, next) {
+
+/* DELETE a cluster by name */
+router.delete('/clusters/:cluster_name', auth, function (req, res, next) {
     Cluster.findOneAndRemove({name: req.params.cluster_name}, req.body, function (err, cluster) {
       if (err) return next(err);
       res.json(cluster);
@@ -134,15 +161,14 @@ router.get('/clusters/:cluster_name', function (req, res, next) {
 
 
 /* Create a system for a particular cluster (found by name as url param) */
-router.post('/clusters/:cluster_name/system', function (req, res, next){
+router.post('/clusters/:cluster_name/system', auth, function (req, res, next){
   Cluster.findOneAndUpdate({name: req.params.cluster_name},
-    {$push: {systems: {hostname: req.body.hostname,
-                      ipaddress: req.body.ipaddress,
-                      alive: req.body.alive
-                      }
-            }
-    },
-    function (err, system){
+    {$push: {
+    systems: {hostname: req.body.hostname,
+              ipaddress: req.body.ipaddress,
+              alive: req.body.alive
+             }}
+    }, function (err, system){
       if(err){ return next(err); }
       res.json(req.body);
   });
@@ -158,11 +184,11 @@ router.get('/clusters/:cluster_name/system/:system_hostname', function (req, res
 });
 
 
-/* Edit a system (found by name) for a cluster found by hostname.
-   ex: curl -X PUT http://127.0.0.1:3000/{clustername}/system/{systemname} -d "hostname=test1&ipaddress=test2&alive=test3"
-         where clustername and system exist.
-   */
-router.put('/clusters/:cluster_name/system/:system_hostname', function (req, res, next){
+/*
+   Edit a system (found by name) for a cluster found by hostname.
+   ex: curl -X PUT http://127.0.0.1:3000/clusters/{clustername1}/system/{systemname} -d "hostname=test1&ipaddress=test2&alive=test3"
+*/
+router.put('/clusters/:cluster_name/system/:system_hostname', auth, function (req, res, next){
   Cluster.update(
     {'systems.hostname' : req.params.system_hostname },
     { $set : {
@@ -182,7 +208,7 @@ router.put('/clusters/:cluster_name/system/:system_hostname', function (req, res
    data apparently can't be sent in a delete request, so had to use param in url
    ex: curl -X DELETE http://127.0.0.1:3000/clusters/{clustername}/system/{systemid}
 */
-router.delete('/clusters/:cluster_name/system/:systemId', function (req, res, next) {
+router.delete('/clusters/:cluster_name/system/:systemId', auth, function (req, res, next) {
     Cluster.findOneAndUpdate({name: req.params.cluster_name},
                               {$pull: {systems: {_id: req.params.systemId }}},
                               function (err, system) {
@@ -194,7 +220,7 @@ router.delete('/clusters/:cluster_name/system/:systemId', function (req, res, ne
 
 
 /* Register endpoint; creates a user given a username and password */
-router.post('/register', function(req, res, next){
+router.post('/register', auth, function(req, res, next){
   if(!req.body.username || !req.body.password){
     return res.status(400).json({message: 'Please fill out all fields'});
   }

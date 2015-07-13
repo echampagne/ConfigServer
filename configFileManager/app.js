@@ -11,6 +11,7 @@ var passport = require('passport');
 
 require('./models/Clusters');
 require('./models/Users');
+require('./models/Property')
 
 var routes = require('./routes/index');
 require('./config/passport');
