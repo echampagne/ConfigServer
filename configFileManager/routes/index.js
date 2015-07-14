@@ -36,67 +36,98 @@ router.get('/properties', function(req, res, next){
   });
 });
 
-/* Post a property */
-router.post('/properties', auth, function (req, res, next){
-    Property.create(req.body, function (err, property) {
-      if(err) return next(err);
-      res.json(property);
-    });
+/* Return the a property found by key. Returns {'key':key, 'value':null} if key doesn't exist */
+router.post('/properties/:key', function(req, res, next){
+  Property.findOne({key : req.params.key}, function (err, properties){
+    if(!properties) {
+      ret_dict = {'key' : req.params.key, 'value': null};
+      return res.json(ret_dict);
+    }
+    res.json(properties)
+  });
+});
+
+/* Edit a property */
+router.put('/edit/properties/:id', function (req, res, next){
+  Property.findByIdAndUpdate(req.params.id,
+    {$set : {key : req.body.key, value : req.body.value}}, function (err, property){
+    if(err) return next(err);
+    res.json(property);
+  })
+})
+
+
+/* Creates a property. Edits value if key already exists. */
+router.post('/add/properties', function (req, res, next){
+    Property.findOneAndUpdate({key : req.body.key },
+      {$set : {key : req.body.key, value : req.body.value}},
+      {upsert: true}, function (err, property){
+        if(err) return next(err);
+        prop_dict = {'key' : req.body.key, 'value' : req.body.value};
+        res.json(prop_dict);
+    })
  });
 
-/* Delete a property */
-router.delete('/properties/:key', auth, function(req, res, next){
+/* Delete a property by key */
+router.post('/delete/properties/:key', function(req, res, next){
   Property.findOneAndRemove({key : req.params.key}, req.body, function (err, property){
     if(err) return next(err);
     res.json(property);
   });
 });
 
+/* Delete a property. Find by id.. used in gui (id guarranteed to exist and be unique) */
+router.delete('/properties/id/:id', function(req, res, next){
+  Property.findByIdAndRemove(req.params.id, req.body, function (err, property){
+    if(err) return next(err);
+    res.json(property);
+  });
+});
 
 
-/* POST
-   Creates a new cluster
-*/
-  router.post('/clusters', auth, function (req, res, next) {
-    Cluster.create({name: req.body.name,
-      manager: {hostname: req.body.hostname,
-                ipaddress: req.body.ipaddress,
-                alive: req.body.alive
-                }}, function (err, cluster) {
-      if (err) return next(err);
-      res.json(cluster);
+/* Create a cluster. Cluster found by name. Edit cluster if name already exists */
+router.post('/clusters', function (req, res, next) {
+    Cluster.findOneAndUpdate({name : req.params.cluster_name},
+      {$set: {name: req.body.name,
+              type: req.body.type,
+              manager: {hostname: req.body.hostname,
+                        ipaddress: req.body.ipaddress,
+                        alive: req.body.alive
+                        }
+            }
+      }, {upsert : true},
+      function (err, cluster) {
+        if (err) return next(err);
+        res.json(cluster);
     });
-  });
+});
 
 
-
-/* PUT
-   Edit a cluster. Cluster found by name
-*/
-  router.put('/clusters/:cluster_name', auth, function (req, res, next) {
-      Cluster.findOneAndUpdate({name : req.params.cluster_name},
-        {$set: {name: req.body.name, manager: {hostname: req.body.hostname,
-                                              ipaddress: req.body.ipaddress,
-                                              alive: req.body.alive
-                                             }
-              }
-        },
-        function (err, system) {
-          if (err) return next(err);
-          res.json(system);
-      });
-  });
-
+  /* Edit a cluster. Find by id */
+router.put('/clusters/:id', function (req, res, next) {
+    Cluster.findByIdAndUpdate(req.params.id,
+      {$set: {name: req.body.name,
+              type: req.body.type,
+              manager: {hostname: req.body.hostname,
+                        ipaddress: req.body.ipaddress,
+                        alive: req.body.alive
+                        }
+            }
+      },
+      function (err, cluster) {
+        if (err) return next(err);
+        res.json(cluster);
+    });
+});
 
 
 /* DELETE a cluster by name */
-router.delete('/clusters/:cluster_name', auth, function (req, res, next) {
+router.delete('/clusters/:cluster_name', function (req, res, next) {
     Cluster.findOneAndRemove({name: req.params.cluster_name}, req.body, function (err, cluster) {
       if (err) return next(err);
       res.json(cluster);
     });
 });
-
 
 
 /* Return an individual cluster found by name*/
@@ -109,7 +140,7 @@ router.get('/clusters/:cluster_name', function (req, res, next) {
 
 
 /* Create a system for a particular cluster (found by name as url param) */
-router.post('/clusters/:cluster_name/system', auth, function (req, res, next){
+router.post('/clusters/:cluster_name/system', function (req, res, next){
   Cluster.findOneAndUpdate({name: req.params.cluster_name},
     {$push: {
     systems: {hostname: req.body.hostname,
@@ -136,7 +167,7 @@ router.get('/clusters/:cluster_name/system/:system_hostname', function (req, res
    Edit a system (found by name) for a cluster found by hostname.
    ex: curl -X PUT http://127.0.0.1:3000/clusters/{clustername1}/system/{systemname} -d "hostname=test1&ipaddress=test2&alive=test3"
 */
-router.put('/clusters/:cluster_name/system/:system_hostname', auth, function (req, res, next){
+router.put('/clusters/:cluster_name/system/:system_hostname', function (req, res, next){
   Cluster.update(
     {'systems.hostname' : req.params.system_hostname },
     { $set : {
@@ -156,7 +187,7 @@ router.put('/clusters/:cluster_name/system/:system_hostname', auth, function (re
    data apparently can't be sent in a delete request, so had to use param in url
    ex: curl -X DELETE http://127.0.0.1:3000/clusters/{clustername}/system/{systemid}
 */
-router.delete('/clusters/:cluster_name/system/:systemId', auth, function (req, res, next) {
+router.delete('/clusters/:cluster_name/system/:systemId', function (req, res, next) {
     Cluster.findOneAndUpdate({name: req.params.cluster_name},
                               {$pull: {systems: {_id: req.params.systemId }}},
                               function (err, system) {
@@ -203,6 +234,13 @@ router.post('/login', function(req, res, next){
       return res.status(401).json(info);
     }
   })(req, res, next);
+});
+
+/* Login endpoint; destroys the user's session */
+router.post('/logout', auth, function(req, res, next){
+  req.session.destroy(function (err) {
+    res.redirect('/');
+  });
 });
 
 
