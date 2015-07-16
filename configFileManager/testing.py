@@ -28,12 +28,20 @@ def request_handler(url, payload, headers=headers):
   else:
     return requests.post(url, data=json.dumps(payload), headers=headers);
 
-def test():
-  url = 'http://localhost:3000/properties'
-  payload = {"key":"test1key", 'value': 'test1val'}
+def test(name):
+  url = 'http://localhost:3000/clusters/%s' % name
+  payload = {}
   response = request_handler(url, payload)
   return response
 
+def update_system(cluster_name, system_name):
+  url = 'http://localhost:3000/clusters/%s/system/%s' % (cluster_name, system_name)
+  payload = {'hostname':system_name, 'alive':'true'}
+  response = request_handler(url, payload)
+  return response
+
+def pretty_print(the_dict):
+  print json.dumps(the_dict, indent=4)
 
 NO_AUTH_TOKEN_ERROR = '<h1>No authorization token was found</h1>'
 EXPIRED_AUTH_TOKEN_ERROR = '<h1>jwt expired</h1>'
@@ -91,9 +99,10 @@ def delete_property(property_name):
     # use utils.exception packet
     return False
 
-
   url = 'http://localhost:3000/logout'
   response = request_handler(url=url, payload={}, headers=headers_with_auth)
   # print response.content
 
   return True
+
+

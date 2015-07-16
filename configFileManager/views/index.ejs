@@ -105,7 +105,7 @@
           if(token){
             var payload = JSON.parse($window.atob(token.split('.')[1]));
 
-            return true;
+            return payload.exp > Date.now() / 1000;
           } else {
 
             return false; // otherwise assume user is logged out
@@ -147,15 +147,26 @@
           return $http.post('/clusters', cluster,
             {headers: {Authorization: 'Bearer '+auth.getToken()}
           }).success(function(data){
-            return res.data;
+            var found=false;
+            for (index=0;index<o.clusters.length;++index){
+              if(o.clusters[index].name === data.name){
+                o.clusters[index].type = data.type;
+                o.clusters[index].manager.hostname = data.manager.hostname;
+                o.clusters[index].manager.ipaddress = data.manager.ipaddress;
+                found=true;
+              }
+            };
+            if(!found) return o.clusters.push(data);
           });
         };
 
-        o.editCluster = function(c_id, cluster){
-          return $http.put('/clusters/'+ c_id, cluster,
+        o.editCluster = function(old_cluster, cluster){
+          return $http.put('/clusters/'+ old_cluster._id, cluster,
             {headers: {Authorization: 'Bearer '+auth.getToken()}
-          }).success(function(res){
-            return res.data;
+          }).success(function(data){
+              var index = o.clusters.indexOf(old_cluster);
+              o.clusters[index] = data;
+              o.clusters[index].systems = old_cluster.systems;
           });
         };
 
@@ -167,20 +178,32 @@
           });
         };
 
-        o.createSystem = function(c_name, system){
-          return $http.post('/clusters/' + c_name + '/system',
+        o.createSystem = function(cluster, system){
+          return $http.post('/clusters/' + cluster.name + '/system',
             {hostname: system.hostname,
             ipaddress: system.ipaddress,
             alive: system.alive},
-            {headers: {Authorization: 'Bearer '+ auth.getToken()}
-         }).success(function(res){
-            return res.data;
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+         }).success(function(data){
+            var c_index = o.clusters.indexOf(cluster);
+            o.clusters[c_index].systems.push(system);
+          });
+        };
+
+        o.editSystem = function(cluster, old_system, system){
+          console.log(system);
+          return $http.post('/clusters/' + cluster.name + '/system/' + old_system.hostname,
+            system, {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+            var c_index = o.clusters.indexOf(cluster);
+            var s_index = o.clusters[c_index].systems.indexOf(old_system);
+            o.clusters[c_index].systems[s_index] = system;
           });
         };
 
         o.deleteSystem = function(c_name, systemId){
           return $http.delete('/clusters/' + c_name + '/system/' + systemId,
-            {headers: {Authorization: 'Bearer: '+ auth.getToken()}
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
               }).success(function(res){
                 return res.data;
               });
@@ -206,15 +229,25 @@
           return $http.post('/add/properties', property,
             {headers: {Authorization: 'Bearer '+auth.getToken()}
           }).success(function(data){
-            p.properties.push(data);
+            var found=false;
+            for (index=0;index<p.properties.length;++index){
+              if(p.properties[index].key === data.key){
+                p.properties[index].value = data.value;
+                found=true;
+              }
+            };
+            if(!found) return p.properties.push(data);
           });
         };
 
-        p.editProperty = function(p_id, property){
-          return $http.put('/edit/properties/' + p_id, property,
+        p.editProperty = function(old_property, property){
+          return $http.put('/edit/properties/' + old_property._id, property,
             {headers: {Authorization: 'Bearer '+auth.getToken()}
           }).success(function(data){
-            p.properties[data.key] = data.value;
+              var index = p.properties.indexOf(old_property);
+              console.log(index);
+              p.properties[index] = data;
+              console.log(data);
           });
         };
 
@@ -245,7 +278,7 @@
         // add a cluster
         $scope.addCluster = function(){
           if(!$scope.name || !$scope.managerhostname || !$scope.manageripaddress || !$scope.type ){ return; }
-
+          console.log('got here');
           clusters.createCluster({name: $scope.name,
                                   type: $scope.type,
                                   hostname: $scope.managerhostname,
@@ -258,7 +291,6 @@
           $scope.managerhostname='';
           $scope.manageripaddress='';
           $scope.manageralive='';
-          window.location.replace("/");
         };
 
         // remove a cluster
@@ -268,10 +300,11 @@
           clusters.deleteCluster(item.name);
         };
 
-
-        $scope.removeSystem = function(name, sys){
-          clusters.deleteSystem(name, sys);
-          window.location.replace("/");
+        $scope.removeSystem = function(cluster, sys){
+          var c_index = $scope.clusters.indexOf(cluster);
+          var s_index = $scope.clusters[c_index].systems.indexOf(sys);
+          $scope.clusters[c_index].systems.splice(s_index, 1);
+          clusters.deleteSystem(cluster.name, sys._id);
         };
 
         // function to open modal to add systems to a cluster
@@ -294,6 +327,7 @@
           });
         };
 
+
         // function to open modal to edit cluster
          $scope.openEdit = function(size, _cluster){
           var modalInstance = $modal.open({
@@ -314,9 +348,28 @@
           });
         };
 
+        // function to open modal to add systems to a cluster
+        $scope.openEditSystem = function(size, _cluster, _system){
+          var modalInstance = $modal.open({
+            templateUrl: 'editSystemModal.html',
+            controller: 'EditSystemModalCtrl',
+            size: size,
+            resolve: {
+              cluster: function() {
+                return _cluster;
+              },
+              clusters: function() {
+                return clusters;
+              },
+              system: function() {
+                return _system;
+              }
+            }
+          });
 
-
-
+          modalInstance.result.then(function(){
+          });
+        };
       }]);
 
     // controller for adding a system to a cluster
@@ -324,17 +377,39 @@
 
       $scope.cluster = cluster;
 
-      $scope.save = function(name){
+      $scope.save = function(cluster){
           newSys = {hostname: $scope.systemhostname,
                     ipaddress: $scope.systemipaddress,
                     alive: $scope.systemalive
                    };
-          clusters.createSystem(name, newSys);
-
-          window.location.replace("/");
+          clusters.createSystem(cluster, newSys);
           $modalInstance.close();
       };
 
+      $scope.cancel = function(){
+        $modalInstance.dismiss('cancel');
+      };
+
+    });
+
+    // controller for adding a system to a cluster
+    myApp.controller('EditSystemModalCtrl', function($scope, $modalInstance, cluster, clusters, system){
+
+      $scope.cluster = cluster;
+      $scope.system =  system;
+      $scope.systemhostname = system.hostname;
+      $scope.systemipaddress = system.ipaddress;
+      $scope.systemalive = system.alive;
+
+
+      $scope.save = function(cluster, sys){
+          newSys = {hostname: $scope.systemhostname,
+                    ipaddress: $scope.systemipaddress,
+                    alive: $scope.systemalive
+                   };
+          clusters.editSystem(cluster, sys, newSys);
+          $modalInstance.close();
+      };
 
       $scope.cancel = function(){
         $modalInstance.dismiss('cancel');
@@ -346,6 +421,12 @@
     // controller for editing a cluster
     myApp.controller('ClusterModalCtrl', function($scope, $modalInstance, cluster, clusters){
       $scope.cluster = cluster;
+      $scope.clustername = cluster.name;
+      $scope.clustertype = cluster.type;
+      $scope.managerhostname = cluster.manager.hostname;
+      $scope.manageripaddress = cluster.manager.ipaddress;
+      $scope.manageralive = cluster.manager.alive;
+
 
       $scope.save = function(c_id){
           newCluster = {name: $scope.clustername,
@@ -354,12 +435,9 @@
                         ipaddress: $scope.manageripaddress,
                         alive: $scope.manageralive,
                        };
-          clusters.editCluster(c_id, newCluster);
-
-          window.location.replace("/");
+          clusters.editCluster(cluster, newCluster);
           $modalInstance.close();
       };
-
 
       $scope.cancel = function(){
         $modalInstance.dismiss('cancel');
@@ -430,16 +508,10 @@
 
         };
 
-
         $scope.remove = function(prop){
           var index = $scope.properties.indexOf(prop);
           $scope.properties.splice(index, 1);
           properties.deleteProperty(prop._id);
-
-        };
-
-        $scope.edit = function(prop){
-          properties.editProperty(prop._id);
         };
 
 
@@ -469,14 +541,15 @@
     myApp.controller('PropertyModalCtrl', function($scope, $modalInstance, property, properties){
 
       $scope.property = property;
+      $scope.key = property.key;
+      $scope.value = property.value;
 
-      $scope.save = function(p_id){
+
+      $scope.save = function(prop){
           newProp = {'key': $scope.key, 'value': $scope.value}
-          properties.editProperty(p_id, newProp);
-          window.location.reload();
+          properties.editProperty(prop, newProp);
           $modalInstance.close();
       };
-
 
       $scope.cancel = function(){
         $modalInstance.dismiss('cancel');
@@ -607,7 +680,10 @@
                       <td> {{ system.ipaddress}} </td>
                       <td> {{ system.alive }} </td>
                       <td ng-show="isLoggedIn()">
-                        <button class="btn btn-danger" ng-click="removeSystem(cluster.name, system._id)">
+                      <button class="btn btn-primary" ng-click="openEditSystem(md, cluster, system)">
+                        <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
+                      </button>
+                        <button class="btn btn-danger" ng-click="removeSystem(cluster, system)">
                           <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
                         </button>
                       </td>
@@ -685,7 +761,33 @@
         </div>
         <div class="modal-footer">
             <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
-            <button class="btn btn-primary" ng-click="save(cluster.name)">Save</button>
+            <button class="btn btn-primary" ng-click="save(cluster)">Save</button>
+        </div>
+    </script>
+
+    <script type="text/ng-template" id="editSystemModal.html">
+       <div class="modal-header">
+            <h3 class="modal-title">Edit System</h3>
+        </div>
+        <div class="modal-body">
+           <form>
+              <div class="form-group">
+                <label for='sysHostname' class="control-label">Hostname:</label>
+                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" ng-required>
+              </div>
+              <div class="form-group">
+                <label for='sysipaddress' class="control-label">ipaddress:</label>
+                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+              </div>
+              <div class="form-group">
+                <label for='sysalive' class="control-label">Alive:</label>
+                <input type="text" id='sysalive' ng-model="systemalive" placeholder="alive" ng-required></p>
+              </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-primary" ng-click="save(cluster, system)">Save</button>
         </div>
     </script>
 
@@ -824,18 +926,18 @@
         <div class="modal-body">
            <form>
               <div class="form-group">
-                <label for='keyid' class="control-label">Hostname:</label>
-                <input type="text" id='keyid' ng-model="key" placeholder="Key" ng-required>
+                <label for='keyid' class="control-label">Key:</label>
+                <input type="text" id='keyid' ng-model="key" ng-required>
               </div>
               <div class="form-group">
-                <label for='valueid' class="control-label">ipaddress:</label>
-                <input type="text" id='valueid' ng-model="value" placeholder="value" ng-required><br/>
+                <label for='valueid' class="control-label">Value:</label>
+                <input type="text" id='valueid' ng-model="value" ng-required><br/>
               </div>
           </form>
         </div>
         <div class="modal-footer">
             <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
-            <button class="btn btn-primary" ng-click="save(property._id)">Save</button>
+            <button class="btn btn-primary" ng-click="save(property)">Save</button>
         </div>
     </script>
 
