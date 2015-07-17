@@ -152,11 +152,10 @@ router.post('/clusters/:cluster_name', function (req, res, next) {
 });
 
 /* Return a cluster given system hostname and cluster IP */
-router.post('/get/cluster/system/:system_ip', auth, function (req, res, next){
+router.post('/get/cluster/system/:system_ip', function (req, res, next){
   Cluster.findOne({'systems.ipaddress' : req.params.system_ip},
                   function(err, cluster){
                     if(err) return next(err);
-                    console.log(cluster);
                     res.json(cluster);
                   });
 });
@@ -202,6 +201,34 @@ router.post('/clusters/:cluster_name/system/:system_hostname', auth, function (r
     if(err) return next(err);
     res.json(system);
   });
+});
+
+/* Expects JSON containing total/available memory, total/available HDD space,
+    and low resources boolean
+    returns calculated available percentage as JSON */
+router.post('/heartbeat/system/:system_ip', auth, function (req, res, next){
+  var objUpdate = {};
+  var setObj = { $set : objUpdate};
+
+  if(Object.keys(req.body).length === 0){
+    setObj.$set['systems.$.alive'] = false;
+  }
+
+  if(req.body.total_mem && req.body.avail_mem)
+    setObj.$set['systems.$.mem_percent_used'] = ((Number(req.body.avail_mem)/(Number(req.body.total_mem)))*100).toFixed(2);;
+
+  if(req.body.total_disk_space && req.body.avail_disk_space)
+    setObj.$set['systems.$.disk_percent_used'] = ((Number(req.body.avail_disk_space)/(Number(req.body.total_disk_space)))*100).toFixed(2);;
+
+  if(req.body.low_resources) setObj.$set['systems.$.low_resources'] = req.body.low_resources;
+
+
+  Cluster.findOneAndUpdate(
+    {'systems.ipaddress' : req.params.system_ip },
+    setObj, {'new' : true}, function (err, system){
+      if(err) return next(err);
+      res.json(system);
+    });
 });
 
 

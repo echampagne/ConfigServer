@@ -110,6 +110,30 @@ def update_system(cluster_name, system_name):
   return True
 
 
+def update_system_resources(system_ip):
+  url = 'http://localhost:3000/login'
+  response = request_handler(url=url, payload={'username':'test1', 'password':'test1'})
+  token = json.loads(response.content).get('token')
+  headers_with_auth = copy.copy(headers)
+  headers_with_auth['Authorization'] = 'Bearer %s' % token
+
+  url = 'http://localhost:3000/heartbeat/system/%s' % system_ip
+  payload = {
+              'total_mem' : '120',
+              'avail_mem' : '30',
+              'total_disk_space' : '180',
+              'avail_disk_space' : '150',
+              'low_resources' : True,
+            }
+  response = request_handler(url=url, payload=payload, headers=headers_with_auth)
+
+  print '======='
+  print pretty_print(json.loads(response.content))
+  print '======='
+
+  return response.content
+
+
 def pretty_print(the_dict):
   print json.dumps(the_dict, indent=4)
 
