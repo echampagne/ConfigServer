@@ -245,9 +245,8 @@
             {headers: {Authorization: 'Bearer '+auth.getToken()}
           }).success(function(data){
               var index = p.properties.indexOf(old_property);
-              console.log(index);
               p.properties[index] = data;
-              console.log(data);
+
           });
         };
 

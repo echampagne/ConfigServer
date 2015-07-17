@@ -72,7 +72,6 @@ router.post('/add/properties', auth, function (req, res, next){
   Property.findOneAndUpdate({key : req.body.key },
     setObj, {upsert: true, 'new': true}, function (err, property){
       if(err) return next(err);
-      console.log(property);
       res.json(property);
   })
  });
@@ -99,17 +98,16 @@ router.post('/clusters', auth, function (req, res, next) {
   var objUpdate = {};
   if (req.body.name) objUpdate.name = req.body.name;
   if (req.body.type) objUpdate.type = req.body.type;
+  if (req.body.clusterIP) objUpdate.clusterIP = req.body.clusterIP;
   var setObj = { $set : objUpdate};
   if (req.body.hostname) setObj.$set['manager.hostname'] = req.body.hostname;
   if (req.body.ipaddress) setObj.$set['manager.ipaddress'] = req.body.ipaddress;
   if (req.body.alive) setObj.$set['manager.alive'] = req.body.alive;
 
-
   Cluster.findOneAndUpdate({name : req.body.name},
     setObj, {upsert : true, 'new': true},
     function (err, cluster) {
       if (err) return next(err);
-      console.log(cluster);
       res.json(cluster);
   });
 });
@@ -121,6 +119,7 @@ router.put('/clusters/:id', auth, function (req, res, next) {
   var objUpdate = {};
   if (req.body.name) objUpdate.name = req.body.name;
   if (req.body.type) objUpdate.type = req.body.type;
+  if (req.body.clusterIP) objUpdate.clusterIP = req.body.clusterIP;
   var setObj = { $set : objUpdate};
   if (req.body.hostname) setObj.$set['manager.hostname'] = req.body.hostname;
   if (req.body.ipaddress) setObj.$set['manager.ipaddress'] = req.body.ipaddress;
@@ -152,6 +151,16 @@ router.post('/clusters/:cluster_name', function (req, res, next) {
   });
 });
 
+/* Return a cluster given system hostname and cluster IP */
+router.post('/get/cluster/system/:system_ip', auth, function (req, res, next){
+  Cluster.findOne({'systems.ipaddress' : req.params.system_ip},
+                  function(err, cluster){
+                    if(err) return next(err);
+                    console.log(cluster);
+                    res.json(cluster);
+                  });
+});
+
 
 /* Create a system for a particular cluster (found by name as url param) */
 router.post('/clusters/:cluster_name/system', auth, function (req, res, next){
@@ -179,7 +188,6 @@ router.get('/clusters/:cluster_name/system/:system_hostname', function (req, res
 
 /*
    Edit a system (found by name) for a cluster found by hostname.
-   ex: curl -X PUT http://127.0.0.1:3000/clusters/{clustername1}/system/{systemname} -d "hostname=test1&ipaddress=test2&alive=test3"
 */
 router.post('/clusters/:cluster_name/system/:system_hostname', auth, function (req, res, next){
   var objUpdate = {};
