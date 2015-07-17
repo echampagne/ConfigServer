@@ -1,0 +1,1079 @@
+<html>
+  <head>
+
+    <!-- Libraries -->
+    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.10/angular.min.js"></script>
+    <script src="//angular-ui.github.io/bootstrap/ui-bootstrap-tpls-0.12.0.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.js"></script>
+    <scipt src="routes/index.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+    <!-- AngularJS script -->
+    <script>
+      var myApp = angular.module('myApp', ['ui.router', 'ui.bootstrap']);
+
+      myApp.config(['$stateProvider', '$urlRouterProvider',
+        function($stateProvider, $urlRouterProvider){
+          $stateProvider
+            .state('home', {
+              url: '/home',
+              templateUrl: '/home.html',
+              controller: 'MainCtrl',
+              resolve:{
+                clusterPromise: ['clusters', function(clusters){
+                  return clusters.getAll();
+                }]
+              }
+            })
+            .state('home_properties', {
+              url: '/home/properties',
+              templateUrl: '/home_properties.html',
+              controller: 'PropertyCtrl',
+              resolve:{
+                propertyPromise: ['properties', function(properties){
+                  return properties.getAll();
+                }]
+              }
+            })
+            .state('login', {
+              url: '/login',
+              templateUrl: '/login.html',
+              controller: 'AuthCtrl',
+              onEnter: ['$state', 'auth', function($state, auth){
+                if(auth.isLoggedIn()){
+                  $state.go('home');
+                }
+              }]
+            })
+            .state('register', {
+              url: '/register',
+              templateUrl: '/register.html',
+              controller: 'AuthCtrl',
+              onEnter: ['$state', 'auth', function($state, auth){
+                if(auth.isLoggedIn()){
+                  $state.go('home');
+                }
+              }]
+            });
+
+          $urlRouterProvider.otherwise('home');
+      }]);
+
+
+      myApp.factory('auth', ['$http', '$window', function($http, $window){
+        var auth = {};
+
+       // posts a user to /register route and saves the token returned
+        auth.register = function(user){
+          return $http.post('/register', user).success(function(data){
+            auth.saveToken(data.token);
+          });
+        };
+
+        // posts a user to /login route and saves the token returned
+        auth.logIn = function(user){
+            return $http.post('/login', user).success(function(data){
+              auth.saveToken(data.token);
+            });
+        };
+
+        // log out removes the users token from local storage
+        auth.logOut = function(user){
+          return $http.post('/logout', user).success(function(data){
+            $window.localStorage.removeItem('cluster-manager-token');
+          });
+        };
+
+        // save the token to local storage
+        auth.saveToken = function (token){
+          $window.localStorage['cluster-manager-token'] = token;
+        };
+
+        // get the token from local storage
+        auth.getToken = function (){
+          return $window.localStorage['cluster-manager-token'];
+        };
+
+        // check if user is logged in by checking token
+        auth.isLoggedIn = function(){
+          var token = auth.getToken();
+
+          // if the token exists, log in
+          if(token){
+            var payload = JSON.parse($window.atob(token.split('.')[1]));
+
+            return payload.exp > Date.now() / 1000;
+          } else {
+
+            return false; // otherwise assume user is logged out
+          }
+        };
+
+        // returns the username of the user that's logged in
+        auth.currentUser = function(){
+          if(auth.isLoggedIn()){
+            var token = auth.getToken();
+            var payload = JSON.parse($window.atob(token.split('.')[1]));
+
+            return payload.username;
+          }
+        };
+
+        return auth;
+      }]);
+
+      /* Service for cluster list */
+      myApp.factory('clusters', ['$http', 'auth', function($http, auth){
+        var o = {
+         clusters: [],
+        };
+
+        o.getAll = function(){
+          return $http.get('/clusters').success(function(data){
+            angular.copy(data, o.clusters);
+          });
+        };
+
+        o.get = function(id){
+          return $http.get('/clusters/' + id).then(function(res){
+            return res.data;
+          });
+        };
+
+        o.createCluster = function(cluster) {
+          return $http.post('/clusters', cluster,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+            var found=false;
+            for (index=0;index<o.clusters.length;++index){
+              if(o.clusters[index].name === data.name){
+                o.clusters[index].type = data.type;
+                o.clusters[index].manager.hostname = data.manager.hostname;
+                o.clusters[index].manager.ipaddress = data.manager.ipaddress;
+                found=true;
+              }
+            };
+            if(!found) return o.clusters.push(data);
+          });
+        };
+
+        o.editCluster = function(old_cluster, cluster){
+          return $http.put('/clusters/'+ old_cluster._id, cluster,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+              var index = o.clusters.indexOf(old_cluster);
+              o.clusters[index] = data;
+              o.clusters[index].systems = old_cluster.systems;
+          });
+        };
+
+        o.deleteCluster = function(c_name){
+           return $http.delete('/clusters/' + c_name,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(res){
+            return res.data;
+          });
+        };
+
+        o.createSystem = function(cluster, system){
+          return $http.post('/clusters/' + cluster.name + '/system',
+            {hostname: system.hostname,
+            ipaddress: system.ipaddress,
+            alive: system.alive},
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+         }).success(function(data){
+            var c_index = o.clusters.indexOf(cluster);
+            o.clusters[c_index].systems.push(system);
+          });
+        };
+
+        o.editSystem = function(cluster, old_system, system){
+
+          return $http.post('/clusters/' + cluster.name + '/system/' + old_system.hostname,
+            system, {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+            var c_index = o.clusters.indexOf(cluster);
+            var s_index = o.clusters[c_index].systems.indexOf(old_system);
+            o.clusters[c_index].systems[s_index] = system;
+          });
+        };
+
+        o.deleteSystem = function(c_name, systemId){
+          return $http.delete('/clusters/' + c_name + '/system/' + systemId,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+              }).success(function(res){
+                return res.data;
+              });
+        };
+
+        return o;
+      }]);
+
+
+      /* Service for property dictionary */
+      myApp.factory('properties', ['$http', 'auth', function($http, auth){
+        var p = {
+          properties: [],
+        };
+
+        p.getAll = function(){
+          return $http.get('/properties').success(function(data){
+            angular.copy(data, p.properties);
+          });
+        };
+
+        p.addProperty = function(property){
+          return $http.post('/add/properties', property,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+            var found=false;
+            for (index=0;index<p.properties.length;++index){
+              if(p.properties[index].key === data.key){
+                p.properties[index].value = data.value;
+                found=true;
+              }
+            };
+            if(!found) return p.properties.push(data);
+          });
+        };
+
+        p.editProperty = function(old_property, property){
+          return $http.put('/edit/properties/' + old_property._id, property,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(data){
+              var index = p.properties.indexOf(old_property);
+              p.properties[index] = data;
+
+          });
+        };
+
+        p.deleteProperty = function(p_id){
+          return $http.delete('/properties/id/' + p_id,
+            {headers: {Authorization: 'Bearer '+auth.getToken()}
+          }).success(function(res){
+            return res.data;
+          });
+        };
+
+        return p;
+      }]);
+
+
+    // controller for cluster list
+    myApp.controller('MainCtrl', ['$scope', 'clusters', 'auth', '$modal',
+      function($scope, clusters, auth, $modal, $log){
+        $scope.clusters = clusters.clusters;
+        $scope.isCollapsed = true;
+        $scope.addform = false;
+        $scope.sortType = 'name'; // set the default sort type
+        $scope.sortReverse  = false;  // set the default sort order
+        $scope.isLoggedIn = auth.isLoggedIn;
+        $scope.manageralive = true;
+
+
+        // add a cluster
+        $scope.addCluster = function(){
+          if(!$scope.name || !$scope.managerhostname || !$scope.manageripaddress || !$scope.type ){ return; }
+
+          clusters.createCluster({name: $scope.name,
+                                  type: $scope.type,
+                                  hostname: $scope.managerhostname,
+                                  ipaddress: $scope.manageripaddress,
+                                  alive: $scope.manageralive
+                                  });
+
+          $scope.name='';
+          $scope.type='';
+          $scope.managerhostname='';
+          $scope.manageripaddress='';
+          $scope.manageralive='';
+        };
+
+        // remove a cluster
+        $scope.remove = function(item){
+          var index = $scope.clusters.indexOf(item);
+          $scope.clusters.splice(index, 1);
+          clusters.deleteCluster(item.name);
+        };
+
+        $scope.removeSystem = function(cluster, sys){
+          var c_index = $scope.clusters.indexOf(cluster);
+          var s_index = $scope.clusters[c_index].systems.indexOf(sys);
+          $scope.clusters[c_index].systems.splice(s_index, 1);
+          clusters.deleteSystem(cluster.name, sys._id);
+        };
+
+
+        $scope.determineProgress = function(value){
+
+          if (value < 25) {
+            return 'success';
+          } else if (value < 50) {
+            return 'info';
+          } else if (value < 75) {
+            return 'warning';
+          } else {
+            return 'danger';
+          }
+        }
+
+        $scope.determineMachineStatus = function(alive, low_resources){
+          if(alive && low_resources)
+            return true;
+          return false;
+        }
+
+        // function to open modal to add systems to a cluster
+        $scope.open = function(size, _cluster){
+          var modalInstance = $modal.open({
+            templateUrl: 'addSystemModal.html',
+            controller: 'SystemModalCtrl',
+            size: size,
+            resolve: {
+              cluster: function() {
+                return _cluster;
+              },
+              clusters: function() {
+                return clusters;
+              }
+            }
+          });
+
+          modalInstance.result.then(function(){
+          });
+        };
+
+
+        // function to open modal to edit cluster
+         $scope.openEdit = function(size, _cluster){
+          var modalInstance = $modal.open({
+            templateUrl: 'editClusterModal.html',
+            controller: 'ClusterModalCtrl',
+            size: size,
+            resolve: {
+              cluster: function() {
+                return _cluster;
+              },
+              clusters: function() {
+                return clusters;
+              }
+            }
+          });
+
+          modalInstance.result.then(function(){
+          });
+        };
+
+        // function to open modal to add systems to a cluster
+        $scope.openEditSystem = function(size, _cluster, _system){
+          var modalInstance = $modal.open({
+            templateUrl: 'editSystemModal.html',
+            controller: 'EditSystemModalCtrl',
+            size: size,
+            resolve: {
+              cluster: function() {
+                return _cluster;
+              },
+              clusters: function() {
+                return clusters;
+              },
+              system: function() {
+                return _system;
+              }
+            }
+          });
+
+          modalInstance.result.then(function(){
+          });
+        };
+      }]);
+
+    // controller for adding a system to a cluster
+    myApp.controller('SystemModalCtrl', function($scope, $modalInstance, cluster, clusters){
+
+      $scope.cluster = cluster;
+
+      $scope.save = function(cluster){
+          newSys = {hostname: $scope.systemhostname,
+                    ipaddress: $scope.systemipaddress,
+                    alive: $scope.systemalive
+                   };
+          clusters.createSystem(cluster, newSys);
+          $modalInstance.close();
+      };
+
+      $scope.cancel = function(){
+        $modalInstance.dismiss('cancel');
+      };
+
+    });
+
+    // controller for adding a system to a cluster
+    myApp.controller('EditSystemModalCtrl', function($scope, $modalInstance, cluster, clusters, system){
+
+      $scope.cluster = cluster;
+      $scope.system =  system;
+      $scope.systemhostname = system.hostname;
+      $scope.systemipaddress = system.ipaddress;
+      $scope.systemalive = system.alive;
+
+
+      $scope.save = function(cluster, sys){
+          newSys = {hostname: $scope.systemhostname,
+                    ipaddress: $scope.systemipaddress,
+                    alive: $scope.systemalive,
+                    mem_percent_used: sys.mem_percent_used,
+                    disk_percent_used: sys.disk_percent_used,
+                    low_resources: sys.low_resources
+                   };
+          clusters.editSystem(cluster, sys, newSys);
+          $modalInstance.close();
+      };
+
+      $scope.cancel = function(){
+        $modalInstance.dismiss('cancel');
+      };
+
+    });
+
+
+    // controller for editing a cluster
+    myApp.controller('ClusterModalCtrl', function($scope, $modalInstance, cluster, clusters){
+      $scope.cluster = cluster;
+      $scope.clustername = cluster.name;
+      $scope.clustertype = cluster.type;
+      $scope.managerhostname = cluster.manager.hostname;
+      $scope.manageripaddress = cluster.manager.ipaddress;
+      $scope.manageralive = cluster.manager.alive;
+
+
+      $scope.save = function(c_id){
+          newCluster = {name: $scope.clustername,
+                        type: $scope.clustertype,
+                        hostname: $scope.managerhostname,
+                        ipaddress: $scope.manageripaddress,
+                        alive: $scope.manageralive,
+                       };
+          clusters.editCluster(cluster, newCluster);
+          $modalInstance.close();
+      };
+
+      $scope.cancel = function(){
+        $modalInstance.dismiss('cancel');
+      };
+
+    });
+
+
+    // Authentication Controller
+    myApp.controller('AuthCtrl', ['$scope', '$state', 'auth',
+      function($scope, $state, auth){
+        $scope.user = {};
+
+        $scope.register = function(){
+          auth.register($scope.user).error(function(error){
+            $scope.error = error;
+          }).then(function(){
+            $state.go('home');
+          });
+        };
+
+        $scope.logIn = function(){
+          auth.logIn($scope.user).error(function(error){
+            $scope.error = error;
+          }).then(function(){
+            $state.go('home');
+          });
+        };
+
+        $scope.logOut = function(){
+          auth.logOut($scope.user).error(function(error){
+            $scope.error = error;
+          }).then(function(){
+            $state.go('home');
+          });
+        };
+
+      }]);
+
+      // Navbar Controller
+      myApp.controller('NavCtrl', ['$scope', 'auth', function($scope, auth){
+        $scope.isLoggedIn = auth.isLoggedIn;
+        $scope.currentUser = auth.currentUser;
+        $scope.logOut = auth.logOut;
+      }]);
+
+
+
+    myApp.controller('PropertyCtrl', ['$scope', 'properties', 'auth', '$modal',
+      function($scope, properties, auth, $modal, $log){
+        $scope.properties = properties.properties;
+        $scope.sortType = 'key';
+        $scope.sortReverse = false;
+        $scope.search = '';
+        $scope.isLoggedIn = auth.isLoggedIn;
+
+
+        $scope.add = function(){
+          if(!$scope.key || !$scope.value){ return; };
+
+          properties.addProperty({
+            key: $scope.key,
+            value: $scope.value
+          });
+
+          $scope.key='';
+          $scope.value='';
+
+        };
+
+        $scope.remove = function(prop){
+          var index = $scope.properties.indexOf(prop);
+          $scope.properties.splice(index, 1);
+          properties.deleteProperty(prop._id);
+        };
+
+
+        // function to open modal to add systems to a cluster
+        $scope.open = function(size, _property){
+          var modalInstance = $modal.open({
+            templateUrl: 'editPropertyModal.html',
+            controller: 'PropertyModalCtrl',
+            size: size,
+            resolve: {
+              property: function() {
+                return _property;
+              },
+              properties: function() {
+                return properties;
+              }
+            }
+          });
+
+          modalInstance.result.then(function(){
+          });
+        };
+    }]);
+
+
+    // controller for adding a system to a cluster
+    myApp.controller('PropertyModalCtrl', function($scope, $modalInstance, property, properties){
+
+      $scope.property = property;
+      $scope.key = property.key;
+      $scope.value = property.value;
+
+
+      $scope.save = function(prop){
+          newProp = {'key': $scope.key, 'value': $scope.value}
+          properties.editProperty(prop, newProp);
+          $modalInstance.close();
+      };
+
+      $scope.cancel = function(){
+        $modalInstance.dismiss('cancel');
+      };
+
+    });
+    </script>
+
+
+
+ </head>
+  <body ng-app='myApp'>
+    <div ui-view></div>
+
+    <script type="text/ng-template" id="/home.html">
+      <div class="page-header">
+        <nav class="navbar navbar-default navbar-fixed-top">
+          <div class="container-fluid">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">Config File Manager</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                <li><a href="#/home/" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home/properties" ng-click="addform=false">Properties</a></li>
+              </ul>
+              <form class="navbar-form navbar-left" role="search">
+                  <div class="form-group">
+                    <div class="input-group">
+                      <div class="input-group-addon"><i class="fa fa-search"></i></div>
+                      <input type="text" class="form-control" placeholder="Search Cluster Names" ng-model="search.name">
+                    </div>
+                  </div>
+              </form>
+              <nav class="nav navbar-nav navbar-right" ng-controller="NavCtrl">
+                <ul class="nav navbar-nav">
+                  <li ng-show="isLoggedIn()"><a>{{ currentUser() }}</a></li>
+                  <li ng-show="isLoggedIn()"><a href="" ng-click="logOut()">Log Out</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/login">Log In</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/register">Register</a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      <div ng-hide="isLoggedIn()">
+            <p><h3 style="margin-left:30px;"> You need to <a href="/#/login">Log In</a> or <a href="/#/register">Register</a> before you can modify clusters.</h3></p></br>
+      </div>
+
+      <div ng-repeat="cluster in clusters | filter:search">
+        <div class="col-md-6">
+        <span>
+          <button class="btn btn-primary" ng-click="isCollapsed = !isCollapsed">
+           {{ cluster.name }}
+          </button>
+          <button class="btn btn-primary" ng-click="openEdit(md, cluster)">
+            <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
+          </button>
+          <button class="btn btn-danger" ng-show="isLoggedIn()" ng-click='remove(cluster)'>
+           <span class='glyphicon glyphicon-remove' aria-hidden='true'></span>
+          </button>
+
+
+          <div ng-show="isCollapsed" >
+            <div class="well">
+              <h4> Cluster Type: {{ cluster.type }}</h4>
+
+              <div ng-show="isLoggedIn()">
+                <button class="btn btn-primary" ng-click='open(md, cluster)'>
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                    Add System
+                </button>
+              </div>
+
+              <table class="table table bordered table-striped">
+                <thead>
+                  <tr>
+                    <td>
+                      <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                        Machine
+                        <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                      <a href="#" ng-click="sortType = 'hostname'; sortReverse = !sortReverse">
+                        Hostname
+                        <span ng-show="sortType == 'hostname' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'hostname' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                      <a href="#" ng-click="sortType = 'ipaddress'; sortReverse = !sortReverse">
+                        IP
+                        <span ng-show="sortType == 'ipaddress' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'ipaddress' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                      <a href="#" ng-click="sortType = 'alive'; sortReverse = !sortReverse">
+                        Alive
+                        <span ng-show="sortType == 'alive' && !sortReverse" class="fa fa-caret-down"></span>
+                        <span ng-show="sortType == 'alive' && sortReverse" class="fa fa-caret-up"></span>
+                      </a>
+                    </td>
+                    <td>
+                        <a href="#"> Mem Usage </a>
+                    </td>
+                    <td>
+                        <a href="#"> Disk Usage </a>
+                    </td>
+                    <td>
+                        <a href="#"> Low Resources </a>
+                    </td>
+
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr>
+                      <td>
+                        <img src='http://www.clker.com/cliparts/q/j/I/0/8/d/green-circle-icon-md.png' ng-show = {{cluster.manager.alive}} style='width:20px;height:20'>
+                        <img src='http://www.clker.com/cliparts/Q/l/D/8/k/m/red-circle-icon-md.png' ng-hide = {{cluster.manager.alive}} style='width:20px;height:20px'>
+                        'Manager'
+                      </td>
+                      <td> {{ cluster.manager.hostname }} </td>
+                      <td> {{ cluster.manager.ipaddress }} </td>
+                      <td> {{ cluster.manager.alive }} </td>
+                  </tr>
+                  <tr ng-repeat='system in cluster.systems'>
+                      <td>
+                      <img src='http://www.clker.com/cliparts/q/j/I/0/8/d/green-circle-icon-md.png' ng-show="system.alive && !system.low_resources" style='width:20px;height:20'>
+                      <img src='http://www.clker.com/cliparts/W/i/K/w/1/D/glossy-orange-circle-icon-md.png' ng-show="system.low_resources && system.alive" style='width:20px;height:20px'>
+                      <img src='http://www.clker.com/cliparts/Q/l/D/8/k/m/red-circle-icon-md.png' ng-show='!system.alive' style='width:20px;height:20px'>
+
+                       </td>
+
+                      <td> {{ system.hostname }} </td>
+                      <td> {{ system.ipaddress}} </td>
+                      <td> {{ system.alive }} </td>
+                      <td>
+                        <progressbar class="progress-striped" value="system.mem_percent_used" ng-init='memprogresstype=determineProgress(system.mem_percent_used)' type="{{memprogresstype}}"> {{ system.mem_percent_used }}% </progressbar>
+                      </td>
+                      <td>
+                        <progressbar class="progress-striped" value="system.disk_percent_used" ng-init='diskprogresstype=determineProgress(system.disk_percent_used)'type='{{diskprogresstype}}'>
+                          {{ system.disk_percent_used }}% </progressbar>
+                      </td>
+                      <td> {{ system.low_resources }}</td>
+                      <td ng-show="isLoggedIn()">
+                      <button class="btn btn-primary" ng-click="openEditSystem(md, cluster, system)">
+                        <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
+                      </button>
+                        <button class="btn btn-danger" ng-click="removeSystem(cluster, system)">
+                          <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
+                        </button>
+                      </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </span>
+        </div>
+      </div>
+
+      <div ng-show="isLoggedIn()">
+        <div class='col-md-4'>
+          <div class='col-md-offset-2'>
+            <img src='http://cdn1.iconfinder.com/data/icons/musthave/256/Add.png' class='img-rounded' ng-click='addform=true' ng-hide='addform' style='height:140;width:140'>
+          </div>
+          <div ng-show='addform'>
+            <div class=well>
+              <form class='form-horizontal' ng-submit="addCluster()">
+                <div class="form-group">
+                  <label for="clusterName" class="col-sm-2 control-label">Cluster Name </label>
+                  <input type="text" id='clusterName' ng-model="name" placeholder="Name">
+                </div>
+                <div class="form-group">
+                  <label for="clusterType" class="col-sm-2 control-label">Cluster Type </label>
+                  <input type="text" id='clusterType' ng-model="type" placeholder="Type" ng-required>
+                </div>
+                <label  class="col-sm-2 control-label">Manager:</label>
+                <div class="form-group">
+                  <label for="managerhost" class="col-sm-2 control-label">Hostname</label>
+                  <input type="text" id='managerhost' ng-model="managerhostname" placeholder="hostname" ng-required>
+                </div>
+                <div class="form-group">
+                  <label for="managerip" class="col-sm-4 control-label">ipaddress</label>
+                  <input type="text" id='managerip'ng-model="manageripaddress" placeholder="ipaddress" ng-required>
+                </div>
+
+                <div class='pull-right'>
+                  <button class="submit btn btn-primary btn-md" ng-click="addform = false" style="padding-bottom: 8 px">
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                  </button>
+                </div>
+              </form>
+              <div class='pull-right' style='padding-right:5px;'>
+                <button class='btn btn-danger btn-sm' ng-click='addform = false'>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </script>
+
+    <script type="text/ng-template" id="addSystemModal.html">
+       <div class="modal-header">
+            <h3 class="modal-title">Add System to {{cluster.name}}</h3>
+        </div>
+        <div class="modal-body">
+           <form>
+              <div class="form-group">
+                <label for='sysHostname' class="control-label">Hostname:</label>
+                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" ng-required>
+              </div>
+              <div class="form-group">
+                <label for='sysipaddress' class="control-label">ipaddress:</label>
+                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+              </div>
+              <div class="form-group">
+                <label for='sysalive' class="control-label">Alive:</label>
+                <input type="text" id='sysalive' ng-model="systemalive" placeholder="alive" ng-required></p>
+              </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-primary" ng-click="save(cluster)">Save</button>
+        </div>
+    </script>
+
+    <script type="text/ng-template" id="editSystemModal.html">
+       <div class="modal-header">
+            <h3 class="modal-title">Edit System</h3>
+        </div>
+        <div class="modal-body">
+           <form>
+              <div class="form-group">
+                <label for='sysHostname' class="control-label">Hostname:</label>
+                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" ng-required>
+              </div>
+              <div class="form-group">
+                <label for='sysipaddress' class="control-label">ipaddress:</label>
+                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+              </div>
+              <div class="form-group">
+                <label for='sysalive' class="control-label">Alive:</label>
+                <input type="text" id='sysalive' ng-model="systemalive" placeholder="alive" ng-required></p>
+              </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-primary" ng-click="save(cluster, system)">Save</button>
+        </div>
+    </script>
+
+
+
+     <script type="text/ng-template" id="editClusterModal.html">
+       <div class="modal-header">
+            <h3 class="modal-title">Edit {{cluster.name}}</h3>
+        </div>
+        <div class="modal-body">
+           <form>
+              <div class="form-group">
+                <label for='clusternameid' class="control-label">Cluster Name:</label>
+                <input type="text" id='clusternameid' ng-model="clustername" placeholder="Name">
+              </div>
+              <div class="form-group">
+                <label for='clustertypeid' class="control-label">Cluster Type:</label>
+                <input type="text" id='clustertypeid' ng-model="clustertype" placeholder="Type">
+              </div>
+              <div class="form-group">
+                <label for='manHostname' class="control-label">Manager Hostname:</label>
+                <input type="text" id='manHostname' ng-model="managerhostname" placeholder="hostname">
+              </div>
+              <div class="form-group">
+                <label for='manipaddress' class="control-label">Manager ipaddress:</label>
+                <input type="text" id='manipaddress' ng-model="manageripaddress" placeholder="ipaddress"><br/>
+              </div>
+              <div class="form-group">
+                <label for='manalive' class="control-label">Manager Alive:</label>
+                <input type="text" id='manalive' ng-model="manageralive" placeholder="alive"></p>
+              </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-primary" ng-click="save(cluster._id)">Save</button>
+        </div>
+    </script>
+
+
+
+    <script type="text/ng-template" id="/home_properties.html">
+       <div class="page-header">
+        <nav class="navbar navbar-default navbar-fixed-top">
+          <div class="container-fluid">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">Config File Manager</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                <li><a href="#/home" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home/properties" ng-click="addform=false">Properties</a></li>
+              </ul>
+              <form class="navbar-form navbar-left" role="search">
+                  <div class="form-group">
+                    <div class="input-group">
+                      <div class="input-group-addon"><i class="fa fa-search"></i></div>
+                      <input type="text" class="form-control" placeholder="Search" ng-model="search">
+                    </div>
+                  </div>
+              </form>
+              <nav class="nav navbar-nav navbar-right" ng-controller="NavCtrl">
+                <ul class="nav navbar-nav">
+                  <li ng-show="isLoggedIn()"><a>{{ currentUser() }}</a></li>
+                  <li ng-show="isLoggedIn()"><a href="" ng-click="logOut()">Log Out</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/login">Log In</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/register">Register</a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      <div ng-show="isLoggedIn()">
+        <form class='form-horizontal' ng-submit="add()">
+          <label for="Key" class="">Key</label>
+          <input type="text" id='Key' ng-model="key" placeholder="Key" ng-required>
+          <label for="Value" class="">Value</label>
+          <input type="text" id='Value' ng-model="value" placeholder="Value" ng-required>
+          <button class="submit btn btn-sm btn-primary">Add</button>
+        </form>
+      </div>
+
+      <table class="table table bordered table-striped">
+        <table class="table table bordered table-striped">
+        <thead>
+          <tr>
+            <td>
+              <a href="#" ng-click="sortType = 'key'; sortReverse = !sortReverse">
+                Key
+                <span ng-show="sortType == 'key' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'key' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
+            <td>
+              <a href="#" ng-click="sortType = 'value'; sortReverse = !sortReverse">
+                Value
+                <span ng-show="sortType == 'value' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'value' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr ng-repeat="prop in properties | orderBy:sortType:sortReverse | filter:search">
+              <td> {{prop.key}} </td>
+              <td>{{prop.value}} </td>
+              <td ng-show="isLoggedIn()">
+                <button class="btn btn-primary" ng-click="open(md, prop)">
+                    <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
+                </button>
+
+                <button class="btn btn-danger" ng-click='remove(prop)'>
+                  <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
+                </button>
+              </td>
+          </tr>
+        </tbody>
+      </table>
+    </script>
+
+
+    <script type="text/ng-template" id="editPropertyModal.html">
+       <div class="modal-header">
+            <h3 class="modal-title">Edit Property</h3>
+        </div>
+        <div class="modal-body">
+           <form>
+              <div class="form-group">
+                <label for='keyid' class="control-label">Key:</label>
+                <input type="text" id='keyid' ng-model="key" ng-required>
+              </div>
+              <div class="form-group">
+                <label for='valueid' class="control-label">Value:</label>
+                <input type="text" id='valueid' ng-model="value" ng-required><br/>
+              </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
+            <button class="btn btn-primary" ng-click="save(property)">Save</button>
+        </div>
+    </script>
+
+
+
+
+
+
+    <!-- Register Template -->
+    <script type="text/ng-template" id="/register.html">
+      <div class="page-header">
+      </div>
+
+      <div ng-show="error" class="alert alert-danger row">
+        <span>{{ error.message }}</span>
+      </div>
+
+      <div class='row'>
+        <div class='col-md-4 col-md-offset-4'>
+          <div class="panel panel-success">
+            <div class="panel-heading">
+              <h3 class="panel-title">Register</h3>
+            </div>
+            <div class="panel-body">
+              <form ng-submit="register()"
+                style="margin-top:30px;">
+                <div class="form-group">
+                  <input type="text"
+                  class="form-control"
+                  placeholder="Username"
+                  ng-model="user.username"></input>
+                </div>
+                <div class="form-group">
+                  <input type="password"
+                  class="form-control"
+                  placeholder="Password"
+                  ng-model="user.password"></input>
+                </div>
+                <button type="submit" class="btn btn-lg btn-success btn-block">Register</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </script>
+
+
+
+    <!-- Login Template -->
+    <script type="text/ng-template" id="/login.html">
+      <div class="page-header">
+      </div>
+
+      <div ng-show="error" class="alert alert-danger row">
+        <span>{{ error.message }}</span>
+      </div>
+
+      <div class='row'>
+        <div class='col-md-4 col-md-offset-4'>
+          <div class="panel panel-success">
+            <div class="panel-heading">
+              <h3 class="panel-title">Log in</h3>
+            </div>
+            <div class="panel-body">
+              <form ng-submit="logIn()"
+                style="margin-top:30px;">
+                <div class="form-group">
+                  <input type="text"
+                  class="form-control"
+                  placeholder="Username"
+                  ng-model="user.username"></input>
+                </div>
+                <div class="form-group">
+                  <input type="password"
+                  class="form-control"
+                  placeholder="Password"
+                  ng-model="user.password"></input>
+                </div>
+                <button type="submit" class="btn btn-lg btn-success btn-block">Log In</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </script>
+
+
+  </body>
+</html>
