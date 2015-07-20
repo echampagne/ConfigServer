@@ -37,7 +37,7 @@ router.get('/properties', function(req, res, next){
 });
 
 /* Return the a property found by key. Returns {'key':key, 'value':null} if key doesn't exist */
-router.post('/properties/:key', function(req, res, next){
+router.post('/properties/:key', auth, function(req, res, next){
   Property.findOne({key : req.params.key}, function (err, properties){
     if(!properties) {
       ret_dict = {'key' : req.params.key, 'value': null};
@@ -151,7 +151,7 @@ router.post('/clusters/:cluster_name', function (req, res, next) {
   });
 });
 
-/* Return a cluster given system hostname and cluster IP */
+/* Return a cluster given system IP */
 router.post('/get/cluster/system/:system_ip', function (req, res, next){
   Cluster.findOne({'systems.ipaddress' : req.params.system_ip},
                   function(err, cluster){

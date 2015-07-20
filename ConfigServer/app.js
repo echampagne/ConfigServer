@@ -16,7 +16,7 @@ require('./models/Property')
 var routes = require('./routes/index');
 require('./config/passport');
 
-mongoose.connect('mongodb://localhost/clusters', function(err) {
+mongoose.connect('mongodb://localhost/', function(err) {
     if(err) {
         console.log('connection error', err);
     } else {
@@ -27,7 +27,7 @@ mongoose.connect('mongodb://localhost/clusters', function(err) {
 var app = express();
 
 // view engine setup
-app.set('views', path.join(__dirname, 'views'));
+app.set('views', path.join(__dirname, 'webcontent/ejs'));
 app.set('view engine', 'ejs');
 
 app.use(favicon());
@@ -35,12 +35,11 @@ app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded());
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'webcontent')));
 
 app.use(passport.initialize());
+
 app.use('/', routes);
-
-
 
 
 /// catch 404 and forwarding to error handler
