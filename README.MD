@@ -3,20 +3,20 @@ A web application to manage configuration file properties and systems on a distr
 
 ## Installation
 Install NodeJS and MongoDB. 
-'''
+```
 ./installMongoAndNode.sh
-'''
+```
 
 ## Usage
 First update the configuration file for MongoDB, mongod.conf
 Then start up the mongo and node servers as daemon screen sessions using
-'''
+```
 ./runConfigServer.sh
-'''
+```
 View the running screens to check that this worked by using the command
-'''
+```
   screen -ls
-'''
+```
 View the webpage on http://localhost:3001
 
 
@@ -150,9 +150,9 @@ View the webpage on http://localhost:3001
   + POST request to suspend to unsuspend a system. A suspended system is not included
   in returns from get requests. However, it is not deleted from the database.
   + Expects JSON
-  '''' javascript
+  ```` javascript
     "suspend": Boolean
-  ''''
+  ````
 
 ## Properties Endpoints
   Note that all properties endpoints require authorization. This is done by tokens.
@@ -206,7 +206,7 @@ View the webpage on http://localhost:3001
 - /add/properties
   + POST request. Creates a property, edits value if key already exists
   + Expects JSON
-  ```` javscript
+  ```` javascript
     {
       "key":"testkey1",
       "value":"testvalue1",
@@ -257,11 +257,11 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  '''' javascipt
+  ```` javascipt
     { 
       "username": "user1" 
     }
-  ''''
+  ````
   
 - /user
   + POST request. Given a username, returns that user's information.
@@ -270,18 +270,18 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  '''' javascipt
+  ```` javascipt
     { 
       "username": "user1" 
     }
-  ''''
+  ````
   + Returns JSON:
-  '''' javascript
+  ```` javascript
     {
       "username": "user1"
       "control_list": ["addProperty", "deleteProperty"]
     }
-  ''''
+  ````
   
 - /user/controls
   + POST request. Given a username and control, add that control to the user's control list
@@ -291,12 +291,12 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  '''' javascipt
+  ```` javascipt
     { 
       "username": "user1",
       "control": "addProperties"
     }
-  ''''
+  ````
   
 - /delete/user/controls
   + POST request. Given a username and control, remove that control for the user's control list.
@@ -305,9 +305,9 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  '''' javascipt
+  ```` javascipt
     { 
       "username": "user1",
       "control": "addProperties"
     }
-  ''''
+ ````
