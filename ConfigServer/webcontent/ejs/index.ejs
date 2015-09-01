@@ -20,7 +20,7 @@
 
             <div class="collapse navbar-collapse" id="navbar-collapse-1">
               <ul class="nav navbar-nav">
-                <li><a href="#/home/" ng-click="addform=false">Clusters</a></li>
+                <li><a href="#/home/" ng-click="clusterview=true;addform=false;">Clusters</a></li>
                 <li><a href="#/home/properties" ng-click="addform=false">Properties</a></li>
               </ul>
               <form class="navbar-form navbar-left" role="search">
@@ -33,8 +33,11 @@
               </form>
               <nav class="nav navbar-nav navbar-right" ng-controller="NavCtrl">
                 <ul class="nav navbar-nav">
+                  <li ng-show="isLoggedIn() && isAdmin()">
+                     <a href="#/home/usercontrols">User Controls</a>
+                  </li>
                   <li ng-show="isLoggedIn()"><a>{{ currentUser() }}</a></li>
-                  <li ng-show="isLoggedIn()"><a href="" ng-click="logOut()">Log Out</a></li>
+                  <li ng-show="isLoggedIn()"><a href="#" ng-click="logOut()">Log Out</a></li>
                   <li ng-hide="isLoggedIn()"><a href="/#/login">Log In</a></li>
                   <li ng-hide="isLoggedIn()"><a href="/#/register">Register</a></li>
                 </ul>
@@ -44,10 +47,17 @@
         </nav>
       </div>
 
+      <div ng-show='clusterview'>
       <div ng-hide="isLoggedIn()">
-            <p><h3 style="margin-left:30px;"> You need to <a href="/#/login">Log In</a> or <a href="/#/register">Register</a> before you can modify clusters.</h3></p></br>
+            <p><h3 style="margin-left:30px;" class='text-center'> You need to <a href="/#/login">Log In</a> to view clusters & properties</h3></p></br>
       </div>
 
+      <div ng-show="alertDisplayed">
+        <alert type='success'> Success </alert>
+      </div>
+
+
+      <div ng-show="isLoggedIn()">
       <div ng-repeat="cluster in clusters | filter:search">
         <div class="col-md-6">
         <span>
@@ -57,14 +67,16 @@
           <button class="btn btn-primary" ng-click="openEdit(md, cluster)">
             <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
           </button>
-          <button class="btn btn-danger" ng-show="isLoggedIn()" ng-click='remove(cluster)'>
+          <button class="btn btn-danger" ng-show="isLoggedIn()" confirm-message="Are you sure you want to delete the cluster?" confirm-click='remove(cluster)'>
            <span class='glyphicon glyphicon-remove' aria-hidden='true'></span>
           </button>
 
 
           <div ng-show="isCollapsed" >
             <div class="well">
-              <h4> Cluster Type: {{ cluster.type }}</h4>
+              <button class='btn btn-primary pull-right' ng-click="openDeployer(md, cluster)"> Deploy </button>
+              <h5> Cluster Type: {{ cluster.type }}</h5>
+              <h5> Last Updated: {{ cluster.lastUpdated | date:'medium' : timezone: '-0400'}} </h5>
 
               <div ng-show="isLoggedIn()">
                 <button class="btn btn-primary" ng-click='open(md, cluster)'>
@@ -73,7 +85,7 @@
                 </button>
               </div>
 
-              <table class="table table bordered table-striped">
+              <table class="table table bordered">
                 <thead>
                   <tr>
                     <td>
@@ -111,7 +123,7 @@
                         <a href="#"> Disk Usage </a>
                     </td>
                     <td>
-                        <a href="#"> Low Resources </a>
+                        <a href="#"> Low Res </a>
                     </td>
 
                   </tr>
@@ -119,41 +131,79 @@
 
                 <tbody>
                   <tr>
-                      <td>
-                        <img src='http://www.clker.com/cliparts/q/j/I/0/8/d/green-circle-icon-md.png' ng-show = {{cluster.manager.alive}} style='width:20px;height:20'>
-                        <img src='http://www.clker.com/cliparts/Q/l/D/8/k/m/red-circle-icon-md.png' ng-hide = {{cluster.manager.alive}} style='width:20px;height:20px'>
-                        'Manager'
-                      </td>
-                      <td> {{ cluster.manager.hostname }} </td>
-                      <td> {{ cluster.manager.ipaddress }} </td>
-                      <td> {{ cluster.manager.alive }} </td>
+                    <td>
+                      <img src='http://www.clker.com/cliparts/q/j/I/0/8/d/green-circle-icon-md.png' ng-show="cluster.manager.alive && !cluster.manager.low_resources" style='width:20px;height:20'>
+                      <img src='http://www.clker.com/cliparts/W/i/K/w/1/D/glossy-orange-circle-icon-md.png' ng-show="cluster.manager.low_resources && cluster.manager.alive" style='width:20px;height:20px'>
+                      <img src='http://www.clker.com/cliparts/Q/l/D/8/k/m/red-circle-icon-md.png' ng-show='!cluster.manager.alive' style='width:20px;height:20px'>
+                      Manager
+                    </td>
+                    <td> {{ cluster.manager.hostname }} </td>
+                    <td> {{ cluster.manager.ipaddress }} </td>
+                    <td> {{ cluster.manager.alive }} </td>
+                    <td>
+                      <progressbar class="progress-striped" style="background-color:#524241" value="cluster.manager.mem_percent_used" ng-init='memprogresstype=determineProgress(cluster.manager.mem_percent_used)' type="{{memprogresstype}}" animate="false">
+                        <span ng-if='cluster.manager.mem_percent_used'>
+                          {{ cluster.manager.mem_percent_used }}%
+                        <span>
+                       </progressbar>
+                    </td>
+                    <td>
+                      <progressbar class="progress-striped" style="background-color:#524242" value="cluster.manager.disk_percent_used" ng-init='diskprogresstype=determineProgress(cluster.manager.disk_percent_used)'type='{{diskprogresstype}}' animate="false">
+                        <span ng-if='cluster.manager.disk_percent_used'>
+                          {{ cluster.manager.disk_percent_used }}%
+                        </span>
+                      </progressbar>
+
+                    </td>
+          		      <td>
+                			{{cluster.manager.low_resources}}
+          		      </td>
+                    <td>
+                      <a href="{{href}}" class="btn btn-success" role="button">Celery Flower <span class='glyphicon glyphicon-grain' aria-hidden='true' ng-init='href=getHref(cluster.manager.ipaddress)'></span></a>
+                    </td>
                   </tr>
-                  <tr ng-repeat='system in cluster.systems'>
+
+                  <tr ng-repeat='system in cluster.systems | orderBy:sortType:sortReverse' ng-class="{'suspendedSystemRow': system.suspended}">
+
                       <td>
-                      <img src='http://www.clker.com/cliparts/q/j/I/0/8/d/green-circle-icon-md.png' ng-show="system.alive && !system.low_resources" style='width:20px;height:20'>
-                      <img src='http://www.clker.com/cliparts/W/i/K/w/1/D/glossy-orange-circle-icon-md.png' ng-show="system.low_resources && system.alive" style='width:20px;height:20px'>
-                      <img src='http://www.clker.com/cliparts/Q/l/D/8/k/m/red-circle-icon-md.png' ng-show='!system.alive' style='width:20px;height:20px'>
+                        <img src='http://www.clker.com/cliparts/q/j/I/0/8/d/green-circle-icon-md.png' ng-show="system.alive && !system.low_resources" style='width:20px;height:20'>
+                        <img src='http://www.clker.com/cliparts/W/i/K/w/1/D/glossy-orange-circle-icon-md.png' ng-show="system.low_resources && system.alive" style='width:20px;height:20px'>
+                        <img src='http://www.clker.com/cliparts/Q/l/D/8/k/m/red-circle-icon-md.png' ng-show='!system.alive' style='width:20px;height:20px'>
+                        System
+                        <div id='overlay' ng-show='{{system.suspended}}'><b>SUSPENDED</b></div>
+                      </td>
 
-                       </td>
-
-                      <td> {{ system.hostname }} </td>
+                      <td> {{ system.hostname }}</td>
                       <td> {{ system.ipaddress}} </td>
                       <td> {{ system.alive }} </td>
                       <td>
-                        <progressbar class="progress-striped" value="system.mem_percent_used" ng-init='memprogresstype=determineProgress(system.mem_percent_used)' type="{{memprogresstype}}"> {{ system.mem_percent_used }}% </progressbar>
+                        <progressbar class="progress-striped" style="background-color:#524242" value="system.mem_percent_used" ng-init='memprogresstype=determineProgress(system.mem_percent_used)' type="{{memprogresstype}}" animate="false">
+                          <span ng-if='system.mem_percent_used'>
+                            {{ system.mem_percent_used }}%
+                          </span>
+                        </progressbar>
                       </td>
                       <td>
-                        <progressbar class="progress-striped" value="system.disk_percent_used" ng-init='diskprogresstype=determineProgress(system.disk_percent_used)'type='{{diskprogresstype}}'>
-                          {{ system.disk_percent_used }}% </progressbar>
+                        <progressbar class="progress-striped" style="background-color:#524242" value="system.disk_percent_used" ng-init='diskprogresstype=determineProgress(system.disk_percent_used)'type='{{diskprogresstype}}' animate="false">
+                          <span ng-if='system.disk_percent_used'>
+                            {{ system.disk_percent_used }}%
+                          </span>
+                        </progressbar>
                       </td>
                       <td> {{ system.low_resources }}</td>
                       <td ng-show="isLoggedIn()">
-                      <button class="btn btn-primary" ng-click="openEditSystem(md, cluster, system)">
-                        <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
-                      </button>
-                        <button class="btn btn-danger" ng-click="removeSystem(cluster, system)">
+                        <button class="btn btn-primary" ng-click="openEditSystem(md, cluster, system)">
+                          <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
+                        </button>
+                        <button class="btn btn-warning" ng-click="suspendSystem(cluster, system)">
+                          <span class="glyphicon glyphicon-pause" aria-hidden='true'></span>
+                        </button>
+                        <button class="btn btn-danger" confirm-message="Are you sure you want to remove the system?" confirm-click="removeSystem(cluster, system)">
                           <span class='glyphicon glyphicon-minus' aria-hidden='true'></span>
                         </button>
+                        <a ng-href="{{href}}" class="btn btn-success" role="button" ng-init='href=getHref(system.ipaddress)'>
+                          <span class='glyphicon glyphicon-grain' aria-hidden='true'></span>
+                        </a>
                       </td>
                   </tr>
                 </tbody>
@@ -163,99 +213,419 @@
         </span>
         </div>
       </div>
-
+      </div>
       <div ng-show="isLoggedIn()">
-        <div class='col-md-4'>
-          <div class='col-md-offset-2'>
-            <img src='http://cdn1.iconfinder.com/data/icons/musthave/256/Add.png' class='img-rounded' ng-click='addform=true' ng-hide='addform' style='height:140;width:140'>
+        <div class='col-md-6'>
+          <div class='row col-md-offset-2'>
+            <button class='btn btn-primary btn-lg' ng-click='toggleAddClusterForm()' ng-hide='addform' style='height:90px;width:160px;margin-top:50px;'> Add Cluster </button>
           </div>
           <div ng-show='addform'>
-            <div class=well>
-              <form class='form-horizontal' ng-submit="addCluster()">
+            <div class=well style='margin-top:34px;'>
+              <form class='form-horizontal' name='form' id='form' ng-submit="addCluster();display();toggleAddClusterForm();">
                 <div class="form-group">
                   <label for="clusterName" class="col-sm-2 control-label">Cluster Name </label>
-                  <input type="text" id='clusterName' ng-model="name" placeholder="Name">
+                  <input type="text" id='clusterName' ng-model="name" placeholder="Name" required>
                 </div>
                 <div class="form-group">
                   <label for="clusterType" class="col-sm-2 control-label">Cluster Type </label>
-                  <input type="text" id='clusterType' ng-model="type" placeholder="Type" ng-required>
+                    <select required id='clusterType' ng-model="type">
+                      <option style="display:none" value="">select a type</option>
+                      <option value="DEV" selected="selected">DEV</option>
+                      <option value="PROD">PROD</option>
+                      <option value="QA">QA</option>
+                    </select>
                 </div>
                 <label  class="col-sm-2 control-label">Manager:</label>
                 <div class="form-group">
                   <label for="managerhost" class="col-sm-2 control-label">Hostname</label>
-                  <input type="text" id='managerhost' ng-model="managerhostname" placeholder="hostname" ng-required>
+                  <input type="text" id='managerhost' ng-model="managerhostname" placeholder="hostname" required>
                 </div>
                 <div class="form-group">
                   <label for="managerip" class="col-sm-4 control-label">ipaddress</label>
-                  <input type="text" id='managerip'ng-model="manageripaddress" placeholder="ipaddress" ng-required>
+                  <input type="text" id='managerip'ng-model="manageripaddress" placeholder="ipaddress" ng-pattern='/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/' required>
+                </div>
+                <div class="form-group">
+                  <label for="managernumcpu" class="col-sm-4 control-label">Number of CPU</label>
+                  <input type="number" id='managernumcpu' ng-model="managerNumCPU" placeholder="Number of CPU" required>
+                </div>
+                <div class="form-group">
+                  <label for="managerram" class="col-sm-4 control-label">RAM</label>
+                  <input type="number" id='managerram' ng-model="managerRAM" placeholder="RAM" required>
                 </div>
 
                 <div class='pull-right'>
-                  <button class="submit btn btn-primary btn-md" ng-click="addform = false" style="padding-bottom: 8 px">
+                  <button class="submit btn btn-primary btn-md" style="padding-bottom: 8 px">
                     <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
                   </button>
                 </div>
               </form>
               <div class='pull-right' style='padding-right:5px;'>
-                <button class='btn btn-danger btn-sm' ng-click='addform = false'>Cancel</button>
+                <button class='btn btn-danger btn-sm' ng-click='toggleAddClusterForm();'>Cancel</button>
               </div>
             </div>
           </div>
         </div>
+      </div>
+      </div>
+
+      <div ng-hide='clusterview' id='deployoutputid'>
+        <span style='margin-left:15px;'> <b>Caution:</b> Do not close this window while deploying. </span>
+        <pre style='background-color:#293025;color:#FFFFFF'>
+          <div id="outputBox" style='height:75%; overflow:scroll;' scroll-glue>
+            <div ng-repeat='message in getData()' style='margin-left:2%;height:18px;'>
+              <div data-ng-bind-html="trustAsHtml(message.output)"> </div>
+              </br>
+            </div>
+          </div>
+        </pre>
+      </div>
+    </script>
+
+
+
+    <script type="text/ng-template" id="user_controls.html">
+      <div class="page-header">
+        <nav class="navbar navbar-default navbar-fixed-top">
+          <div class="container-fluid">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1" aria-expanded="false">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <a class="navbar-brand" href="#">Config File Manager</a>
+            </div>
+
+            <div class="collapse navbar-collapse" id="navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                <li><a href="#/home/" ng-click="clusterview=true;addform=false;">Clusters</a></li>
+                <li><a href="#/home/properties" ng-click="addform=false">Properties</a></li>
+              </ul>
+
+              <nav class="nav navbar-nav navbar-right" ng-controller="NavCtrl">
+                <ul class="nav navbar-nav">
+                  <li ng-show="isLoggedIn() && isAdmin()">
+                     <a href="#/home/usercontrols">User Controls</a>
+                  </li>
+                  <li ng-show="isLoggedIn()"><a>{{ currentUser() }}</a></li>
+                  <li ng-show="isLoggedIn()"><a href="#" ng-click="logOut()">Log Out</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/login">Log In</a></li>
+                  <li ng-hide="isLoggedIn()"><a href="/#/register">Register</a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      <div class='row' ng-hide='showSearch'>
+        <div class='col-md-4 col-md-offset-4'>
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <h3 class="panel-title">Search for a User</h3>
+            </div>
+            <div class="panel-body">
+              <form ng-submit="findUser(username)"
+                style="margin-top:30px;">
+                <div class="form-group">
+                  <input type="text"
+                  class="form-control"
+                  placeholder="Username"
+                  ng-model="username"></input>
+                </div>
+                <button type="submit" class="btn btn-lg btn-primary btn-block">Search</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class='row' ng-show="showSearch">
+        <div class='col-md-4 col-md-offset-2'>
+          <div class="panel panel-info">
+            <div class="panel-heading">
+              <h3 class="panel-title text-center">{{ user.username }}</h3>
+            </div>
+            <ul class='list-group'>
+              <li class='list-group-item' ng-repeat="control in user.control_list">  {{control}} </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="btn-group" ng-show="showOptions" style='margin-left:20px;'>
+          <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Options <span class="caret"></span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a ng-click="showAdd=true;showOptions=false;">Add Control</a></li>
+            <li><a ng-click="showDelete=true;showOptions=false">Remove Control</a></li>
+            <li role="separator" class="divider"></li>
+            <li><a ng-click="showSearch=false">Finished</a></li>
+          </ul>
+        </div>
+
+        <div class="col-md-4" ng-show="showAdd">
+          <div class="panel panel-info" style='height: 175px'>
+            <div class="panel-heading">
+              <h3 class="panel-title text-center">Add a User Control</h3>
+            </div>
+            <div class='panel-body'>
+              <form ng-submit="addControl(user.username, control);showAdd=false;showOptions=true;">
+                <div class="btn-group-lg" role="group">
+                <select class='control-dropdown' ng-model='control' ng-init='control=control_options[0]' ng-options='option for option in control_options' required>
+                </select>
+                  <button type='submit' class='btn btn-info'>Add</button>
+                  <button type='button' class='btn btn-info' ng-click="showAdd=false;showOptions=true;">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4" ng-show="showDelete">
+          <div class="panel panel-info" style='height: 175px'>
+            <div class="panel-heading">
+              <h3 class="panel-title text-center">Remove a User Control</h3>
+            </div>
+            <div class='panel-body'>
+              <form ng-submit="removeControl(user.username, control);showDelete=false;showOptions=true;">
+                <div class="btn-group-lg" role="group">
+                <select class='control-dropdown' ng-model='control' ng-init='control=control_options[0]' ng-options='option for option in control_options' required>
+                </select>
+                  <button type='submit' class='btn btn-info'>Remove</button>
+                  <button type='button' class='btn btn-info' ng-click="showDelete=false;showOptions=true;">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
       </div>
 
 
     </script>
 
     <script type="text/ng-template" id="addSystemModal.html">
-       <div class="modal-header">
+        <div class="modal-header">
             <h3 class="modal-title">Add System to {{cluster.name}}</h3>
         </div>
         <div class="modal-body">
-           <form>
+           <form name="addSystemForm">
               <div class="form-group">
                 <label for='sysHostname' class="control-label">Hostname:</label>
-                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" ng-required>
+                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" required>
               </div>
               <div class="form-group">
                 <label for='sysipaddress' class="control-label">ipaddress:</label>
-                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-pattern='/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b$/' required><br/>
+              </div>
+              <div class="form-group">
+                <label for='sysnumcpu' class="control-label">Number of CPU:</label>
+                <input type="number" id='sysnumcpu' ng-model="systemNumCPU" placeholder="Number of CPU" required>
+              </div>
+              <div class="form-group">
+                <label for='sysRAM' class="control-label">RAM:</label>
+                <input type="number" id='sysRAM' ng-model="systemRAM" placeholder="RAM" required>
               </div>
               <div class="form-group">
                 <label for='sysalive' class="control-label">Alive:</label>
-                <input type="text" id='sysalive' ng-model="systemalive" placeholder="alive" ng-required></p>
+                <select id='sysalive' ng-init='systemalive = aliveOptions[1]' ng-model="systemalive" ng-options="option for option in aliveOptions">
+                </select>
               </div>
-          </form>
+           </form>
         </div>
         <div class="modal-footer">
             <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
-            <button class="btn btn-primary" ng-click="save(cluster)">Save</button>
+            <button class="btn btn-primary" ng-disabled="addSystemForm.$invalid" ng-click="save(cluster)">Save</button>
         </div>
     </script>
 
+
+
+
+    <script type="text/ng-template" id="deployerModal.html">
+      <div class="modal-header">
+        <h3 class="modal-title text-center">Deployer</h3>
+      </div>
+      <div class="modal-body">
+        <form name='deployform' id='deployform' ng-submit="deploy()">
+          <div class="form-group">
+            <label for='select_system' class='control-label'>Deploy from:</label>
+            <select id='select_system' ng-init="system_to_deploy = deployfromOptions[0]" ng-model='system_to_deploy' ng-options="option for option in deployfromOptions" required>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Deploying:</label>
+            <label>Manager
+              <input type='checkbox' ng-model='checkboxModel.manager'>
+            </label>
+            <label>Pipeline Engine
+              <input type='checkbox' ng-model='checkboxModel.pipeline'>
+            </label>
+          </div>
+
+          <div class="form-group" collapse="system_to_deploy != deployfromOptions[2]">
+            <label>Attach Zipfiles:</label>
+            <table class="table table bordered table-striped">
+              <body>
+                <tr>
+                <div ng-show="uploader.isHTML5">
+                  <th>
+                    <div class="my-drop-zone">
+                      Manager
+                      <input type="file" nv-file-select="" uploader="uploader"/>
+                    </div>
+                  </th>
+                  <th>
+                    <div class="my-drop-zone">
+                      PipelineEngine
+                      <input type="file" nv-file-select="" uploader="uploader"/>
+                    </div>
+                  </th>
+                </div>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="col-md-9" style="margin-bottom: 40px" collapse="uploader.queue.length == 0">
+              <h3>Upload queue</h3>
+              <p>Queue length: {{ uploader.queue.length }}</p>
+
+              <table class="table" style="font-size:13">
+                <thead>
+                  <tr>
+                    <th width="50%">Name</th>
+                    <th ng-show="uploader.isHTML5">Size</th>
+                    <th ng-show="uploader.isHTML5">Progress</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr ng-repeat="item in uploader.queue">
+                    <td><strong>{{ item.file.name }}</strong></td>
+                    <td ng-show="uploader.isHTML5" nowrap>{{ item.file.size/1024/1024|number:2 }} MB</td>
+                    <td ng-show="uploader.isHTML5">
+                      <div class="progress" style="margin-bottom: 0;">
+                        <div class="progress-bar" role="progressbar" ng-style="{ 'width': item.progress + '%' }"></div>
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <span ng-show="item.isSuccess"><i class="glyphicon glyphicon-ok"></i></span>
+                      <span ng-show="item.isCancel"><i class="glyphicon glyphicon-ban-circle"></i></span>
+                      <span ng-show="item.isError"><i class="glyphicon glyphicon-remove"></i></span>
+                    </td>
+                    <td nowrap>
+                      <button type="button" class="btn btn-success btn-xs" ng-click="item.upload()" ng-disabled="item.isReady || item.isUploading || item.isSuccess">
+                        <span class="glyphicon glyphicon-upload"></span> Upload
+                      </button>
+                      <button type="button" class="btn btn-warning btn-xs" ng-click="item.cancel()" ng-disabled="!item.isUploading">
+                        <span class="glyphicon glyphicon-ban-circle"></span> Cancel
+                      </button>
+                      <button type="button" class="btn btn-danger btn-xs" ng-click="item.remove()">
+                        <span class="glyphicon glyphicon-trash"></span> Remove
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div>
+                <div>
+                  Queue progress:
+                  <div class="progress" style="">
+                      <div class="progress-bar" role="progressbar" ng-style="{ 'width': uploader.progress + '%' }"></div>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-success btn-s" ng-click="uploader.uploadAll()" ng-disabled="!uploader.getNotUploadedItems().length">
+                  <span class="glyphicon glyphicon-upload"></span> Upload all
+                </button>
+                <button type="button" class="btn btn-warning btn-s" ng-click="uploader.cancelAll()" ng-disabled="!uploader.isUploading">
+                  <span class="glyphicon glyphicon-ban-circle"></span> Cancel all
+                </button>
+                <button type="button" class="btn btn-danger btn-s" ng-click="uploader.clearQueue()" ng-disabled="!uploader.queue.length">
+                  <span class="glyphicon glyphicon-trash"></span> Remove all
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+
+          <table class="table table bordered table-striped">
+            <thead>
+              <tr>
+                <th>
+                  Hostname
+                </th>
+                <th>
+                  Root Password
+                </th>
+                <th>
+                  Pipeline Password
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td> {{cluster.manager.hostname}} </td>
+                <td> <input type="string" ng-model='cluster.manager.rootpassword'style="width:100%"/> </td>
+                <td> <input type="string" ng-model='cluster.manager.pplnuserpassword'style="width:100%"/> </td>
+              </tr>
+
+              <tr ng-repeat='system in cluster.systems'>
+                <td> {{system.hostname}}
+                <td> <input type="string" ng-model='system.rootpassword'style="width:100%"/> </td>
+                <td> <input type="string" ng-model='system.pplnuserpassword'style="width:100%"/> </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2 class='text-center'>OR</h2>
+
+          <h5 class='text-center'>Express Deploy </h5>
+            <textarea ng-model='expressdeploytext' placeholder= 'Paste in the config you want you use. Remove Config = so that input is json parsable. WARNING: Use Express Deployer only if you know what you are doing.' style='width:100%;height:250px;'></textarea>
+
+      	  <h5 class='text-center'>Additional Args</h5>
+      	    <textarea ng-model='additionalArgs' placeholder='(Optional) (For Example: --KILL) WARNING: Only use Additional Args if you absolutely know what you are doing.' style='width:100%;height:60px;'></textarea>
+          <div class='text-center'>
+            <button class='btn btn-lg btn-primary btn-submit' style='margin-top:10px' ng-disabled="disableDeploy()">Deploy</button>
+          </div>
+          <div ng-show='disableDeploy()'>
+            <h3 class="text-center"> Someone else is deploying, try again later. </h3>
+          </div>
+        </form>
+      </div>
+    </script>
+
+
+
     <script type="text/ng-template" id="editSystemModal.html">
-       <div class="modal-header">
+        <div class="modal-header">
             <h3 class="modal-title">Edit System</h3>
         </div>
         <div class="modal-body">
-           <form>
+           <form name='editSystemForm'>
               <div class="form-group">
                 <label for='sysHostname' class="control-label">Hostname:</label>
-                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" ng-required>
+                <input type="text" id='sysHostname' ng-model="systemhostname" placeholder="hostname" required>
               </div>
               <div class="form-group">
-                <label for='sysipaddress' class="control-label">ipaddress:</label>
-                <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-required><br/>
+                <label for='sysipaddress' class="control-label">ipaddress:</label> <input type="text" id='sysipaddress' ng-model="systemipaddress" placeholder="ipaddress" ng-pattern='/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b$/' required><br/>
               </div>
               <div class="form-group">
                 <label for='sysalive' class="control-label">Alive:</label>
-                <input type="text" id='sysalive' ng-model="systemalive" placeholder="alive" ng-required></p>
+                <select id='sysalive' ng-init='systemalive' ng-model="systemalive" ng-options="option for option in aliveOptions" equired>
+                </select>
               </div>
+              <div><b>Number of CPU:</b> {{numCPU}}</div><br/>
+              <div><b>RAM:</b> {{RAM}} </div>
           </form>
         </div>
         <div class="modal-footer">
             <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
-            <button class="btn btn-primary" ng-click="save(cluster, system)">Save</button>
+            <button class="btn btn-primary" ng-disabled="editSystemForm.$invalid" ng-click="save(cluster, system)">Save</button>
         </div>
     </script>
 
@@ -266,36 +636,37 @@
             <h3 class="modal-title">Edit {{cluster.name}}</h3>
         </div>
         <div class="modal-body">
-           <form>
+           <form name="editClusterForm">
               <div class="form-group">
                 <label for='clusternameid' class="control-label">Cluster Name:</label>
-                <input type="text" id='clusternameid' ng-model="clustername" placeholder="Name">
+                <input type="text" id='clusternameid' ng-model="clustername" placeholder="Name" required>
               </div>
               <div class="form-group">
                 <label for='clustertypeid' class="control-label">Cluster Type:</label>
-                <input type="text" id='clustertypeid' ng-model="clustertype" placeholder="Type">
+                <input type="text" id='clustertypeid' ng-model="clustertype" placeholder="Type" required>
               </div>
               <div class="form-group">
                 <label for='manHostname' class="control-label">Manager Hostname:</label>
-                <input type="text" id='manHostname' ng-model="managerhostname" placeholder="hostname">
+                <input type="text" id='manHostname' ng-model="managerhostname" placeholder="hostname" required>
               </div>
               <div class="form-group">
                 <label for='manipaddress' class="control-label">Manager ipaddress:</label>
-                <input type="text" id='manipaddress' ng-model="manageripaddress" placeholder="ipaddress"><br/>
+                <input type="text" id='manipaddress' ng-model="manageripaddress" placeholder="ipaddress" ng-pattern='/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b$/' required><br/>
               </div>
               <div class="form-group">
                 <label for='manalive' class="control-label">Manager Alive:</label>
-                <input type="text" id='manalive' ng-model="manageralive" placeholder="alive"></p>
+                <select id='manalive' ng-init='manageralive' ng-model="manageralive" ng-options='option for option in aliveOptions' required>
+                </select>
               </div>
+              <div><b>Number of CPU:</b> {{numCPU}}</div><br/>
+              <div><b>RAM:</b> {{RAM}} </div>
           </form>
         </div>
         <div class="modal-footer">
             <button class="btn btn-danger" ng-click="cancel()">Cancel</button>
-            <button class="btn btn-primary" ng-click="save(cluster._id)">Save</button>
+            <button class="btn btn-primary" ng-disabled="editClusterForm.$invalid" ng-click="save(cluster._id)">Save</button>
         </div>
     </script>
-
-
 
     <script type="text/ng-template" id="/home_properties.html">
        <div class="page-header">
@@ -326,8 +697,11 @@
               </form>
               <nav class="nav navbar-nav navbar-right" ng-controller="NavCtrl">
                 <ul class="nav navbar-nav">
+                  <li ng-show="isLoggedIn() && isAdmin()">
+                     <a href="#/home/usercontrols">User Controls</a>
+                  </li>
                   <li ng-show="isLoggedIn()"><a>{{ currentUser() }}</a></li>
-                  <li ng-show="isLoggedIn()"><a href="" ng-click="logOut()">Log Out</a></li>
+                  <li ng-show="isLoggedIn()"><a href="#" ng-click="logOut()">Log Out</a></li>
                   <li ng-hide="isLoggedIn()"><a href="/#/login">Log In</a></li>
                   <li ng-hide="isLoggedIn()"><a href="/#/register">Register</a></li>
                 </ul>
@@ -337,17 +711,24 @@
         </nav>
       </div>
 
+      <div ng-show="alertDisplayed">
+        <alert type='success'> Success </alert>
+      </div>
+
       <div ng-show="isLoggedIn()">
-        <form class='form-horizontal' ng-submit="add()">
+        <form class='form-horizontal' ng-submit="add();display();">
           <label for="Key" class="">Key</label>
-          <input type="text" id='Key' ng-model="key" placeholder="Key" ng-required>
+          <textarea msd-elastic id='Key' ng-model="key" placeholder="Key" style="margin-bottom: -17px" required></textarea>
           <label for="Value" class="">Value</label>
-          <input type="text" id='Value' ng-model="value" placeholder="Value" ng-required>
+          <textarea msd-elastic id='Value' ng-model="value" placeholder="Value" style="margin-bottom:-17px;" required></textarea>
+          <label for="Description" class="">Description</label>
+          <textarea msd-elastic id='Description' ng-model="description" placeholder="Description" style="margin-bottom:-17px;"></textarea>
           <button class="submit btn btn-sm btn-primary">Add</button>
         </form>
       </div>
 
-      <table class="table table bordered table-striped">
+      <div ng-show="isLoggedIn()" class='propertyTable' >
+      <table class="table table bordered table-striped" style="table-layout:fixed; width:auto">
         <table class="table table bordered table-striped">
         <thead>
           <tr>
@@ -365,13 +746,21 @@
                 <span ng-show="sortType == 'value' && sortReverse" class="fa fa-caret-up"></span>
               </a>
             </td>
+            <td>
+              <a href="#" ng-click="sortType = 'value'; sortReverse = !sortReverse">
+                Description
+                <span ng-show="sortType == 'description' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'description' && sortReverse" class="fa fa-caret-up"></span>
+              </a>
+            </td>
           </tr>
         </thead>
 
         <tbody>
           <tr ng-repeat="prop in properties | orderBy:sortType:sortReverse | filter:search">
-              <td> {{prop.key}} </td>
-              <td>{{prop.value}} </td>
+              <td class='wrapword'> {{prop.key}} </td>
+              <td><pre>{{ prop.value | json:4}}</pre></td>
+              <td class='wrapword'>{{prop.description}}</td>
               <td ng-show="isLoggedIn()">
                 <button class="btn btn-primary" ng-click="open(md, prop)">
                     <span class='glyphicon glyphicon-pencil' aria-hidden='true'></span>
@@ -384,6 +773,9 @@
           </tr>
         </tbody>
       </table>
+      </div>
+
+
     </script>
 
 
@@ -392,15 +784,18 @@
             <h3 class="modal-title">Edit Property</h3>
         </div>
         <div class="modal-body">
-           <form>
-              <div class="form-group">
-                <label for='keyid' class="control-label">Key:</label>
-                <input type="text" id='keyid' ng-model="key" ng-required>
-              </div>
-              <div class="form-group">
-                <label for='valueid' class="control-label">Value:</label>
-                <input type="text" id='valueid' ng-model="value" ng-required><br/>
-              </div>
+          <form>
+            <div class="form-group">
+              <label for='keyid' class="control-label">Key:</label>
+              <input type="text" id='keyid' ng-model="key" ng-required>
+            </div>
+            <div class="form-group">
+              <label for='valueid' class="control-label">Value:</label>
+              <textarea msd-elastic id='valueid' ng-model="value" ng-required></textarea><br/>
+            </div>
+
+            <label for='descid' class="control-label">Description:</label>
+            <textarea msd-elastic id='descid' ng-model="description" placeholder="Description" style="margin-bottom:-17px;"></textarea>
           </form>
         </div>
         <div class="modal-footer">
@@ -408,11 +803,6 @@
             <button class="btn btn-primary" ng-click="save(property)">Save</button>
         </div>
     </script>
-
-
-
-
-
 
     <!-- Register Template -->
     <script type="text/ng-template" id="/register.html">
@@ -453,7 +843,6 @@
     </script>
 
 
-
     <!-- Login Template -->
     <script type="text/ng-template" id="/login.html">
       <div class="page-header">
@@ -492,13 +881,18 @@
       </div>
     </script>
 
-    <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.10/angular.min.js"></script>
-    <script src="//angular-ui.github.io/bootstrap/ui-bootstrap-tpls-0.12.0.js"></script>
-    <script src="http://cdnjs.cloudflare.com/ajax/libs/angular-ui-router/0.2.10/angular-ui-router.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
-    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css">
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
+
+    <script src='/bower_components/jquery/dist/jquery.min.js'></script>
+    <script src='/bower_components/angular/angular.min.js'></script>
+    <script src='/bower_components/angular-bootstrap/ui-bootstrap-tpls.js'></script>
+    <script src='/bower_components/angular-ui-router/release/angular-ui-router.js'></script>
+    <link rel="stylesheet" href='/bower_components/bootstrap/dist/css/bootstrap.min.css'>
+    <link rel="stylesheet" href='/bower_components/fontawesome/css/font-awesome.css'>
+    <script src='/bower_components/bootstrap/dist/js/bootstrap.min.js'></script>
+    <script src="https://cdn.socket.io/socket.io-1.3.5.js"></script>
+
+
 
     <script src='/js/ConfigServer/ConfigServerApp.js'></script>
     <script src='/js/ConfigServer/Controllers/AuthController.js'></script>
@@ -509,9 +903,18 @@
     <script src='/js/ConfigServer/Controllers/PropertyController.js'></script>
     <script src='/js/ConfigServer/Controllers/PropertyModalController.js'></script>
     <script src='/js/ConfigServer/Controllers/systemModalController.js'></script>
+    <script src='/js/ConfigServer/Controllers/deploystreamModalController.js'></script>
+    <script src='/js/ConfigServer/Controllers/deployerModalController.js'></script>
+    <script src='/js/ConfigServer/Controllers/UserController.js'></script>
     <script src='/js/ConfigServer/Services/authFactory.js'></script>
     <script src='/js/ConfigServer/Services/clusterFactory.js'></script>
     <script src='/js/ConfigServer/Services/propertiesFactory.js'></script>
+    <script src='/js/ConfigServer/Services/UserControlFactory.js'></script>
+    <script src='/js/ConfigServer/Directives/confirmClick.js'></script>
 
+    <link rel="stylesheet" type="text/css" href="/css/indexStyle.css">
+    <script src='/bower_components/angular-scroll-glue/src/scrollglue.js'></script>
+    <script src='/bower_components/angular-file-upload/dist/angular-file-upload.min.js'></script>
+    <script src='/bower_components/angular-elastic/elastic.js'></script>
   </body>
 </html>

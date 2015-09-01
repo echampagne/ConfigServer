@@ -2,7 +2,6 @@
 
 A web application to help manage clusters and properties of a distributed system.
 
-
 ## Cluster/System Endpoints
 
 - /clusters

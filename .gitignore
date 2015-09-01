@@ -1,0 +1,21 @@
+# Python byte code #
+.pyc
+# Logs, screen logs end with .0 #
+.0
+.log
+
+# Don't include these folder. User's install themselves #
+bin
+etc
+lib
+share
+mongodb
+node-latest-install
+
+# MongoDB data stored here #
+workspace
+
+# Sublime project/workspace #
+*.sublime-project
+*.sublime-workspace
+

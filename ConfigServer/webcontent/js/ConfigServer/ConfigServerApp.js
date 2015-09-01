@@ -1,4 +1,4 @@
-var myApp = angular.module('myApp', ['ui.router', 'ui.bootstrap']);
+var myApp = angular.module('myApp', ['ui.router', 'ui.bootstrap', 'luegg.directives', 'angularFileUpload', 'monospaced.elastic']);
 
 myApp.config(['$stateProvider', '$urlRouterProvider',
   function($stateProvider, $urlRouterProvider){
@@ -42,6 +42,11 @@ myApp.config(['$stateProvider', '$urlRouterProvider',
             $state.go('home');
           }
         }]
+      })
+      .state('user_controls', {
+        url: '/home/usercontrols',
+        templateUrl: 'user_controls.html',
+        controller: 'UserController'
       });
 
     $urlRouterProvider.otherwise('home');

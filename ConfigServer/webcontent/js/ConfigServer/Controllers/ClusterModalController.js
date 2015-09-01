@@ -7,9 +7,17 @@ myApp.controller('ClusterModalCtrl', function($scope, $modalInstance, cluster, c
   $scope.managerhostname = cluster.manager.hostname;
   $scope.manageripaddress = cluster.manager.ipaddress;
   $scope.manageralive = cluster.manager.alive;
-
+  $scope.numCPU = cluster.manager.numCPU;
+  $scope.RAM = cluster.manager.RAM;
+  $scope.success = false;
+  $scope.aliveOptions = [true, false];
 
   $scope.save = function(c_id){
+    if ($scope.editClusterForm.$valid &&
+        $scope.clustername &&
+        $scope.clustertype &&
+        $scope.managerhostname &&
+        $scope.manageripaddress){
       newCluster = {name: $scope.clustername,
                     type: $scope.clustertype,
                     hostname: $scope.managerhostname,
@@ -17,7 +25,10 @@ myApp.controller('ClusterModalCtrl', function($scope, $modalInstance, cluster, c
                     alive: $scope.manageralive,
                    };
       clusters.editCluster(cluster, newCluster);
-      $modalInstance.close();
+      $scope.success = true;
+    }
+
+    $modalInstance.close($scope.success);
   };
 
   $scope.cancel = function(){

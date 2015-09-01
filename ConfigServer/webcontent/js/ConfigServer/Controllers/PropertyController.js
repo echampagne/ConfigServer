@@ -1,24 +1,32 @@
 var myApp = angular.module('myApp');
-myApp.controller('PropertyCtrl', ['$scope', 'properties', 'auth', '$modal',
-  function($scope, properties, auth, $modal, $log){
+myApp.controller('PropertyCtrl', ['$scope', 'properties', 'auth', '$modal', '$timeout', '$log',
+  function($scope, properties, auth, $modal, $timeout, $log){
     $scope.properties = properties.properties;
     $scope.sortType = 'key';
     $scope.sortReverse = false;
     $scope.search = '';
     $scope.isLoggedIn = auth.isLoggedIn;
-
+    $scope.alertDisplayed = false;
 
     $scope.add = function(){
       if(!$scope.key || !$scope.value){ return; };
-
-      properties.addProperty({
-        key: $scope.key,
-        value: $scope.value
-      });
+      if(!$scope.description){
+        properties.addProperty({
+          key: $scope.key,
+          value: $scope.value
+        });
+      }
+      if($scope.description){
+        properties.addProperty({
+          key: $scope.key,
+          value: $scope.value,
+          description: $scope.description
+        });
+        $scope.description='';
+      }
 
       $scope.key='';
       $scope.value='';
-
     };
 
     $scope.remove = function(prop){
@@ -27,6 +35,12 @@ myApp.controller('PropertyCtrl', ['$scope', 'properties', 'auth', '$modal',
       properties.deleteProperty(prop._id);
     };
 
+     $scope.display = function(){
+        $scope.alertDisplayed = true;
+      $timeout(function() {
+        $scope.alertDisplayed = false;
+      }, 3000)
+    };
 
     // function to open modal to add systems to a cluster
     $scope.open = function(size, _property){
@@ -45,6 +59,7 @@ myApp.controller('PropertyCtrl', ['$scope', 'properties', 'auth', '$modal',
       });
 
       modalInstance.result.then(function(){
+        $scope.display();
       });
     };
 }]);

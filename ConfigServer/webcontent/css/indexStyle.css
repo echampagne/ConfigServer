@@ -1,0 +1,74 @@
+tr.suspendedSystemRow{
+  background-color: #bbb;
+  opacity: .5;
+  margin-bottom:-200px;
+  position:relative;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+}
+
+#overlay {
+    position: absolute;
+    z-index:100;
+    color: red;
+}
+
+table.table.bordered {
+  font-size: 13px;
+}
+
+.btn {
+  font-size: 13px !important;
+  margin-bottom: 5px !important;
+}
+
+.form-horizontal input.ng-invalid.ng-touched {
+ border: 1px solid red;
+}
+.form-horizontal select.ng-invalid.ng-touched {
+ border: 1px solid red;
+}
+
+
+.my-drop-zone {
+  border: dotted 3px lightgray !important;
+  text-align:left;
+  margin-bottom: 0px !important;
+  font-size: 10px;
+  padding:10px !important;
+}
+
+.nv-file-over { border: dotted 3px red; } /* Default class applied to drop zones on over */
+.another-file-over-class { border: dotted 3px green; }
+html, body { height: 100%; }
+
+
+.wrapword{
+  white-space: -moz-pre-wrap !important;
+  white-space: -webkit-pre-wrap;
+  white-space: -pre-wrap;
+  white-space: -o-pre-wrap;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-all;
+  white-space: normal;
+}
+
+.button-transparent{
+  background-color: Transparent;
+  background-repeat:no-repeat;
+  border: none;
+  cursor:pointer;
+  overflow: hidden;
+  outline:none;
+}
+
+.control-dropdown{
+  border-color: #46b8da;
+  color: #46b8da;
+  width: 50%;
+  margin-right:30px;
+}

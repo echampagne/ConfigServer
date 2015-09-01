@@ -59,5 +59,15 @@ myApp.factory('auth', ['$http', '$window', function($http, $window){
     }
   };
 
+  auth.getControl_list = function(){
+    if(auth.isLoggedIn()){
+      var token = auth.getToken();
+      var payload = JSON.parse($window.atob(token.split('.')[1]));
+
+      return payload.control_list;
+    }
+  };
+
+
   return auth;
 }]);

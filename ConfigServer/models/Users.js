@@ -4,6 +4,7 @@ var jwt = require('jsonwebtoken');
 
 var UserSchema = new mongoose.Schema({
   username: {type: String, lowercase: true, unique: true},
+  control_list: [],
   hash: String,
   salt: String
 });
@@ -22,8 +23,6 @@ UserSchema.methods.validPassword = function(password) {
 
 // note that secret token is hard coded here.. change this before use1
 UserSchema.methods.generateJWT = function() {
-
-
   var today = new Date();
   var exp = new Date(today);
   exp.setDate(today.getDate() + 1);
@@ -31,6 +30,7 @@ UserSchema.methods.generateJWT = function() {
   return jwt.sign({
     _id: this._id,
     username: this.username,
+    control_list: this.control_list,
     exp: parseInt(exp.getTime() / 1000), // Expires in 1 day
   }, 'SECRET');
 };
