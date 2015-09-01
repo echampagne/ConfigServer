@@ -11,6 +11,7 @@ lib
 share
 mongodb
 node-latest-install
+mongod.conf
 
 # MongoDB data stored here #
 workspace
