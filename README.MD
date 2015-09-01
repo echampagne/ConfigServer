@@ -1,11 +1,16 @@
 # ConfigServer
 A web application to manage configuration file properties and systems on a distributed network.
+Uses Mongo, Node and Express for the backend. Front end made using Angular.
 
 ## Installation
-Install NodeJS and MongoDB. 
+Install NodeJS and MongoDB.
 ```
 ./installMongoAndNode.sh
 ```
+Install the remaining node dependencies: 
+angularjs-scroll-glue, busboy, express, jsonwebtoken, mongoose, node-schedule, passport, passport-local, python-shell,
+request, socket.io
+Angular modules located and installed in ConfigServer/ConfigServer/webcontent/bower_components
 
 ## Usage
 First update the configuration file for MongoDB, mongod.conf
@@ -20,7 +25,6 @@ View the running screens to check that this worked by using the command
 View the webpage on http://localhost:3001
 
 
-  
 
 ## System Endpoints
   Note that all system endpoints require authorization. This is done by tokens.
