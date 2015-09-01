@@ -1,8 +1,8 @@
 # Python byte code #
-.pyc
+*.pyc
 # Logs, screen logs end with .0 #
-.0
-.log
+*.0
+*.log
 
 # Don't include these folder. User's install themselves #
 bin
