@@ -164,7 +164,7 @@ View the webpage on http://localhost:3001
   in returns from get requests. However, it is not deleted from the database.
   + Expects JSON
   ```` javascript
-    "suspend": Boolean
+     {"suspend": Boolean} 
   ````
 
 ## Properties Endpoints
