@@ -18,6 +18,7 @@ Install the remaining node dependencies:
   * python-shell,
   * request
   * socket.io
+
 Angular modules located and installed in `ConfigServer/ConfigServer/webcontent/bower_components`
 
 ## Usage
