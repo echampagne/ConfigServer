@@ -7,10 +7,18 @@ Install NodeJS and MongoDB.
 ```
 ./installMongoAndNode.sh
 ```
-Install the remaining node dependencies: 
-angularjs-scroll-glue, busboy, express, jsonwebtoken, mongoose, node-schedule, passport, passport-local, python-shell,
-request, socket.io
-Angular modules located and installed in ConfigServer/ConfigServer/webcontent/bower_components
+Install the remaining node dependencies:
+  * angularjs-scroll-glue
+  * busboy, express
+  * jsonwebtoken
+  * mongoose
+  * node-schedule
+  * passport
+  * passport-local
+  * python-shell,
+  * request
+  * socket.io
+Angular modules located and installed in `ConfigServer/ConfigServer/webcontent/bower_components`
 
 ## Usage
 First update the configuration file for MongoDB, mongod.conf
