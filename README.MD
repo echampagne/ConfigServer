@@ -223,7 +223,7 @@ View the webpage on http://localhost:3001
     {
       "key":"testkey1",
       "value":"testvalue1",
-      "description": testdescription"
+      "description": "testdescription"
     }
   ````
 
@@ -270,10 +270,8 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  ```` javascipt
-    { 
-      "username": "user1" 
-    }
+  ```` javascript
+    {"username": "user1"}
   ````
   
 - /user
@@ -283,15 +281,13 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  ```` javascipt
-    { 
-      "username": "user1" 
-    }
+  ```` javascript
+    {"username": "user1"}
   ````
   + Returns JSON:
   ```` javascript
     {
-      "username": "user1"
+      "username": "user1",
       "control_list": ["addProperty", "deleteProperty"]
     }
   ````
@@ -304,7 +300,7 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  ```` javascipt
+  ```` javascript
     { 
       "username": "user1",
       "control": "addProperties"
@@ -318,7 +314,7 @@ View the webpage on http://localhost:3001
   {"Authorization" : "Bearer [AUTH_TOKEN_VALUE]"}
   ````
   + Expects JSON
-  ```` javascipt
+  ```` javascript
     { 
       "username": "user1",
       "control": "addProperties"
